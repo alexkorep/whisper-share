@@ -1,4 +1,5 @@
-// No top-level import for ffmpeg/ffmpeg anymore, it's loaded globally via script tag in index.html
+// app.js
+// FFmpeg class is loaded globally via script tag in index.html as window.FFmpeg.FFmpeg
 
 document.addEventListener("DOMContentLoaded", () => {
   const apiKeyInput = document.getElementById("apiKey");
@@ -22,23 +23,73 @@ document.addEventListener("DOMContentLoaded", () => {
     "audio-transcriber-pwa-shared-files-v1";
   let sharedFileFromCache = null;
 
-  // FFMPEG setup using the global window.FFmpeg
+  // FFMPEG setup
   let ffmpegInstance = null;
   let ffmpegLoaded = false;
-  const { fetchFile } = window.FFmpeg; // Destructure fetchFile from the global
+
+  // Correct way to access fetchFile when FFmpeg UMD is loaded:
+  // It's often under FFmpeg.util.fetchFile
+  // Or ensure your UMD build exposes it as expected.
+  // Let's assume it's available directly on the FFmpeg object exported by UMD,
+  // or under a 'util' namespace.
+  // The createFFmpeg function itself (which we are not using now) would return an object with fetchFile.
+  // The global `window.FFmpeg` object from the UMD build is `ffmpeg.js` itself.
+  // Its `fetchFile` utility is usually `window.FFmpeg.fetchFile` or `window.FFmpeg.utils.fetchFile`.
+  // Given your error, `window.FFmpeg.fetchFile` is likely undefined.
+
+  // From the error, `window.FFmpeg` itself is the object created by the UMD script.
+  // If `fetchFile` isn't directly on it, it might be on an older API or a submodule.
+  // Let's check the documentation/source for @ffmpeg/ffmpeg@0.12.9 UMD.
+  // Looking at the UMD output for 0.12.9, it does put fetchFile directly on the exported object.
+  // The issue might be that window.FFmpeg is not yet populated when that line is executed.
+  // Let's defer accessing it.
+
+  let localFetchFile; // We will assign this inside ensureFFmpegLoaded
 
   async function ensureFFmpegLoaded() {
-    if (!ffmpegLoaded && window.FFmpeg) {
+    if (!window.FFmpeg || !window.FFmpeg.FFmpeg) {
+      const errMsg =
+        "Error: FFMPEG library or FFmpeg class not found. Check script tag in HTML.";
+      console.error(errMsg);
+      setStatus(errMsg, "error");
+      throw new Error(errMsg);
+    }
+
+    // Assign fetchFile here, once we know window.FFmpeg is available
+    if (!localFetchFile && window.FFmpeg.fetchFile) {
+      localFetchFile = window.FFmpeg.fetchFile;
+    } else if (!localFetchFile) {
+      // Fallback or error if fetchFile is still not found where expected
+      // This might happen if the UMD structure is different than assumed.
+      // For @ffmpeg/ffmpeg@0.12.9 UMD, `window.FFmpeg.fetchFile` should be correct.
+      const errMsg =
+        "Error: FFmpeg.fetchFile utility not found. Library may have loaded incorrectly.";
+      console.error(errMsg);
+      setStatus(errMsg, "error");
+      throw new Error(errMsg);
+    }
+
+    if (!ffmpegLoaded) {
       setStatus(
         "Loading FFMPEG conversion engine (core ~30MB, one-time download)...",
         "loading"
       );
       try {
-        ffmpegInstance = new window.FFmpeg.FFmpeg(); // Create new instance
+        ffmpegInstance = new window.FFmpeg.FFmpeg();
         ffmpegInstance.on("log", ({ type, message }) => {
-          // Listen to log events
-          console.log(`FFMPEG [${type}]: ${message}`);
+          // console.log(`FFMPEG [${type}]: ${message}`); // Verbose
         });
+        // Listen for progress if needed
+        ffmpegInstance.on("progress", ({ progress, time }) => {
+          if (progress > 0 && progress < 1) {
+            // Avoid logging 0 and 1 for brevity
+            setStatus(
+              `Conversion progress: ${(progress * 100).toFixed(1)}%`,
+              "loading"
+            );
+          }
+        });
+
         await ffmpegInstance.load({
           coreURL:
             "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd/ffmpeg-core.js",
@@ -53,22 +104,21 @@ document.addEventListener("DOMContentLoaded", () => {
           "Error: FFMPEG engine failed to load. Conversion not possible.",
           "error"
         );
-        ffmpegInstance = null; // Ensure instance is null on failure
+        ffmpegInstance = null;
         throw error;
       }
-    } else if (!window.FFmpeg) {
-      const errMsg =
-        "Error: FFMPEG library not found. Check script tag in HTML.";
-      console.error(errMsg);
-      setStatus(errMsg, "error");
-      throw new Error(errMsg);
     }
   }
 
   async function convertToMp3(inputFile) {
     if (!ffmpegInstance || !ffmpegLoaded) {
-      await ensureFFmpegLoaded(); // This will throw if it fails
+      await ensureFFmpegLoaded();
     }
+    // Ensure localFetchFile is available
+    if (!localFetchFile) {
+      await ensureFFmpegLoaded(); // This will try to assign it or throw
+    }
+
     setStatus(
       `Converting "${inputFile.name}" to MP3... Please wait.`,
       "loading"
@@ -78,19 +128,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const outputFileName = "output.mp3";
 
     try {
-      // Write the file to FFMPEG's virtual file system
-      await ffmpegInstance.writeFile(inputFileName, await fetchFile(inputFile));
-
-      // Run the FFMPEG command
-      // Using exec for v0.11+
-      // For v0.12: ff.exec([...])
-      // For v0.10 or older: ff.run('-i', inputFileName, outputFileName);
+      await ffmpegInstance.writeFile(
+        inputFileName,
+        await localFetchFile(inputFile)
+      ); // Use localFetchFile
       await ffmpegInstance.exec(["-i", inputFileName, outputFileName]);
-
-      // Read the result
       const data = await ffmpegInstance.readFile(outputFileName);
 
-      // Clean up files (optional, but good practice if processing many files)
       await ffmpegInstance.deleteFile(inputFileName);
       await ffmpegInstance.deleteFile(outputFileName);
 
@@ -105,17 +149,12 @@ document.addEventListener("DOMContentLoaded", () => {
         `Error converting "${inputFile.name}" to MP3: ${error.message}`,
         "error"
       );
-      // Attempt to clean up
       try {
         await ffmpegInstance.deleteFile(inputFileName);
-      } catch (e) {
-        /* ignore */
-      }
+      } catch (e) {}
       try {
         await ffmpegInstance.deleteFile(outputFileName);
-      } catch (e) {
-        /* ignore */
-      }
+      } catch (e) {}
       throw error;
     }
   }
@@ -263,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
             content: [
               {
                 type: "text",
-                text: "Transcribe an audio file into text in the Russian language.\n\n# Steps...\n\n# Output Format...\n\n# Notes...", // Your system prompt
+                text: "Transcribe an audio file into text in the Russian language.\n\n# Steps\n\n1. Listen to the audio file carefully.\n2. Transcribe the spoken words into written text without altering the spoken content.\n3. Pay attention to grammatical nuances and punctuation in Russian.\n4. If specific terms, jargon, or unintelligible segments occur, note these with time-stamps if possible.\n\n# Output Format\n\n- The transcription should be provided as plain text, in Russian.\n- Ensure correct use of punctuation and capitalization according to Russian grammar rules.\n\n# Notes\n\n- If any portion of the audio is unclear, mark it as [unintelligible] and provide the timestamp.\n- Ensure the transcription is accurate and reflects the original speech faithfully.",
               },
             ],
           },
@@ -346,11 +385,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function setStatus(message, type = "info") {
     statusDiv.textContent = message;
     statusDiv.className = type;
-    console.log(`Status [${type}]: ${message}`);
+    if (type !== "loading") {
+      // Avoid flooding console with progress updates
+      console.log(`Status [${type}]: ${message}`);
+    }
   }
 
+  // Initial load
   loadApiKey();
-  handleSharedFile();
+  handleSharedFile(); // Check for shared files
   if (
     !localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) &&
     !sharedFileFromCache
@@ -358,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Please enter and save your OpenAI API Key.", "info");
   }
 
+  // Service Worker registration
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
