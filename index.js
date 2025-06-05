@@ -1,18 +1,48 @@
 // index.js
-// Replace with your OpenAI API key
-const OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY';
+
+function getApiKey() {
+  return localStorage.getItem('openai_api_key') || '';
+}
+
+function saveApiKey(key) {
+  localStorage.setItem('openai_api_key', key);
+}
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
 
 window.addEventListener('load', async () => {
-  if (!location.search.includes('share')) return;
+  const input = document.getElementById('api-key');
+  const saveBtn = document.getElementById('save-key');
+  const message = document.getElementById('message');
 
+  const savedKey = getApiKey();
+  if (savedKey) input.value = savedKey;
+
+  saveBtn.addEventListener('click', async () => {
+    const key = input.value.trim();
+    if (!key) {
+      alert('Please enter a valid API key');
+      return;
+    }
+    saveApiKey(key);
+    saveBtn.textContent = 'Saved';
+    if (location.search.includes('share')) {
+      await transcribe(key, message);
+    }
+  });
+
+  if (location.search.includes('share') && savedKey) {
+    await transcribe(savedKey, message);
+  }
+});
+
+async function transcribe(apiKey, messageEl) {
   const cache = await caches.open('incoming');
   const resp = await cache.match('latest-audio');
   if (!resp) {
-    document.body.innerText = 'No audio file found';
+    messageEl.innerText = 'No audio file found';
     return;
   }
   const file = await resp.blob();
@@ -24,9 +54,9 @@ window.addEventListener('load', async () => {
 
   const transcription = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
     body: fd,
   }).then(r => r.json()).catch(err => ({ error: err.toString() }));
 
-  document.body.innerText = transcription.text || transcription.error || 'No speech detected';
-});
+  messageEl.innerText = transcription.text || transcription.error || 'No speech detected';
+}
