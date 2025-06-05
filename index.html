@@ -1,20 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>M4A Transcriber</title>
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  <h1>M4A Transcriber</h1>
-  <p>Share an audio file with this app to transcribe it using OpenAI Whisper.</p>
-  <div id="key-section">
-    <label for="api-key">OpenAI API Key:</label>
-    <input id="api-key" type="password" placeholder="sk-...">
-    <button id="save-key">Save</button>
-  </div>
-  <div id="message"></div>
-  <script src="index.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#333333" />
+    <title>Audio Transcriber PWA</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icon-192x192.png" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Audio File Transcriber</h1>
+
+      <div class="settings">
+        <label for="apiKey">OpenAI API Key:</label>
+        <input
+          type="password"
+          id="apiKey"
+          placeholder="Enter your OpenAI API Key"
+        />
+        <button id="saveApiKey">Save Key</button>
+        <p id="apiKeyStatus" class="status-message"></p>
+      </div>
+
+      <div class="transcription-section">
+        <label for="audioFile">Select M4A Audio File:</label>
+        <input type="file" id="audioFile" accept=".m4a" />
+
+        <button id="transcribeButton">Transcribe Audio</button>
+      </div>
+
+      <div class="output-section">
+        <h2>Transcription:</h2>
+        <div id="status"></div>
+        <textarea
+          id="transcriptionOutput"
+          rows="15"
+          readonly
+          placeholder="Transcription will appear here..."
+        ></textarea>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
 </html>
