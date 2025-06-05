@@ -27,7 +27,6 @@
       <div class="transcription-section">
         <label for="audioFile">Select Audio File (M4A, MP3, WAV, etc.):</label>
         <input type="file" id="audioFile" accept="audio/*,.m4a" />
-        <!-- Accept general audio and specifically .m4a -->
 
         <button id="transcribeButton">Transcribe Audio</button>
       </div>
@@ -35,7 +34,6 @@
       <div class="output-section">
         <h2>Transcription:</h2>
         <div id="status"></div>
-        <!-- Status messages will appear here -->
         <textarea
           id="transcriptionOutput"
           rows="15"
@@ -45,19 +43,10 @@
       </div>
     </div>
 
-    <!-- Load FFMPEG first, as app.js will use it -->
-    <!-- NOTE: ffmpeg.min.js is an ES module, so app.js must also be a module -->
-    <script type="module">
-      // This is just to make createFFmpeg and fetchFile globally available for app.js
-      // if app.js itself is not a module.
-      // A better way is to make app.js a module and import there.
-      // For simplicity with the current structure, we'll make them available on window.
-      // This is NOT ideal but works without changing app.js to import.
-      // See app.js for the module-based approach which is cleaner.
-      // import { createFFmpeg, fetchFile } from "https://unpkg.com/@ffmpeg/ffmpeg@0.12.9/dist/ffmpeg.min.js";
-      // window.FFMPEG = { createFFmpeg, fetchFile };
-    </script>
-    <!-- app.js will now be a module to use imports -->
+    <!-- Load FFMPEG UMD library directly -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.9/dist/umd/ffmpeg.js"></script>
+
+    <!-- app.js will still be a module to organize its code and potentially use other imports if needed -->
     <script type="module" src="app.js"></script>
   </body>
 </html>

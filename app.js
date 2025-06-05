@@ -1,7 +1,4 @@
-import {
-  createFFmpeg,
-  fetchFile,
-} from "https://unpkg.com/@ffmpeg/ffmpeg@0.12.9/dist/ffmpeg.min.js";
+// No top-level import for ffmpeg/ffmpeg anymore, it's loaded globally via script tag in index.html
 
 document.addEventListener("DOMContentLoaded", () => {
   const apiKeyInput = document.getElementById("apiKey");
@@ -14,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const sharedFileInfoDiv = document.createElement("div");
   sharedFileInfoDiv.id = "sharedFileInfo";
   if (audioFileInput.parentNode) {
-    // Ensure parentNode exists
     audioFileInput.parentNode.insertBefore(
       sharedFileInfoDiv,
       audioFileInput.nextSibling
@@ -26,22 +22,29 @@ document.addEventListener("DOMContentLoaded", () => {
     "audio-transcriber-pwa-shared-files-v1";
   let sharedFileFromCache = null;
 
-  // FFMPEG setup
-  const ffmpeg = createFFmpeg({
-    log: true, // Enables FFMPEG logging in the console (useful for debugging)
-    corePath: "https://unpkg.com/@ffmpeg/core@0.12.9/dist/ffmpeg-core.js",
-    // mainName: 'main' // For versions <0.11 for multi-threading, not needed for >=0.12 default
-  });
+  // FFMPEG setup using the global window.FFmpeg
+  let ffmpegInstance = null;
   let ffmpegLoaded = false;
+  const { fetchFile } = window.FFmpeg; // Destructure fetchFile from the global
 
   async function ensureFFmpegLoaded() {
-    if (!ffmpegLoaded) {
+    if (!ffmpegLoaded && window.FFmpeg) {
       setStatus(
         "Loading FFMPEG conversion engine (core ~30MB, one-time download)...",
         "loading"
       );
       try {
-        await ffmpeg.load();
+        ffmpegInstance = new window.FFmpeg.FFmpeg(); // Create new instance
+        ffmpegInstance.on("log", ({ type, message }) => {
+          // Listen to log events
+          console.log(`FFMPEG [${type}]: ${message}`);
+        });
+        await ffmpegInstance.load({
+          coreURL:
+            "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd/ffmpeg-core.js",
+          wasmURL:
+            "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd/ffmpeg-core.wasm",
+        });
         ffmpegLoaded = true;
         setStatus("FFMPEG engine loaded.", "success");
       } catch (error) {
@@ -50,29 +53,46 @@ document.addEventListener("DOMContentLoaded", () => {
           "Error: FFMPEG engine failed to load. Conversion not possible.",
           "error"
         );
-        throw error; // Re-throw to stop processing
+        ffmpegInstance = null; // Ensure instance is null on failure
+        throw error;
       }
+    } else if (!window.FFmpeg) {
+      const errMsg =
+        "Error: FFMPEG library not found. Check script tag in HTML.";
+      console.error(errMsg);
+      setStatus(errMsg, "error");
+      throw new Error(errMsg);
     }
   }
 
   async function convertToMp3(inputFile) {
-    await ensureFFmpegLoaded();
+    if (!ffmpegInstance || !ffmpegLoaded) {
+      await ensureFFmpegLoaded(); // This will throw if it fails
+    }
     setStatus(
       `Converting "${inputFile.name}" to MP3... Please wait.`,
       "loading"
     );
 
-    const inputFileName = inputFile.name || "inputfile"; // Use original name or a default
+    const inputFileName = inputFile.name || "inputfile";
     const outputFileName = "output.mp3";
 
     try {
-      ffmpeg.FS("writeFile", inputFileName, await fetchFile(inputFile));
-      await ffmpeg.run("-i", inputFileName, outputFileName);
-      const data = ffmpeg.FS("readFile", outputFileName);
+      // Write the file to FFMPEG's virtual file system
+      await ffmpegInstance.writeFile(inputFileName, await fetchFile(inputFile));
 
-      // Clean up files from virtual file system
-      ffmpeg.FS("unlink", inputFileName);
-      ffmpeg.FS("unlink", outputFileName);
+      // Run the FFMPEG command
+      // Using exec for v0.11+
+      // For v0.12: ff.exec([...])
+      // For v0.10 or older: ff.run('-i', inputFileName, outputFileName);
+      await ffmpegInstance.exec(["-i", inputFileName, outputFileName]);
+
+      // Read the result
+      const data = await ffmpegInstance.readFile(outputFileName);
+
+      // Clean up files (optional, but good practice if processing many files)
+      await ffmpegInstance.deleteFile(inputFileName);
+      await ffmpegInstance.deleteFile(outputFileName);
 
       setStatus(
         `Conversion of "${inputFile.name}" to MP3 successful.`,
@@ -85,18 +105,18 @@ document.addEventListener("DOMContentLoaded", () => {
         `Error converting "${inputFile.name}" to MP3: ${error.message}`,
         "error"
       );
-      // Attempt to clean up in case of partial success before error
+      // Attempt to clean up
       try {
-        ffmpeg.FS("unlink", inputFileName);
+        await ffmpegInstance.deleteFile(inputFileName);
       } catch (e) {
         /* ignore */
       }
       try {
-        ffmpeg.FS("unlink", outputFileName);
+        await ffmpegInstance.deleteFile(outputFileName);
       } catch (e) {
         /* ignore */
       }
-      throw error; // Re-throw
+      throw error;
     }
   }
 
@@ -139,10 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus("Attempting to load shared file...", "loading");
         try {
           if (!("caches" in window)) {
-            setStatus(
-              "Error: Cache API not available to retrieve shared file.",
-              "error"
-            );
+            setStatus("Error: Cache API not available.", "error");
             return;
           }
           const cache = await caches.open(SHARED_FILES_CACHE_NAME_CLIENT);
@@ -173,10 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 audioFileInput.value = "";
                 audioFileInput.style.display = "block";
                 sharedFileInfoDiv.innerHTML = "";
-                setStatus("Shared file cleared. Select a new file.", "info");
+                setStatus("Shared file cleared.", "info");
               });
             setStatus(
-              `Shared file "${sharedFileFromCache.name}" loaded. Ready for conversion/transcription.`,
+              `Shared file "${sharedFileFromCache.name}" loaded.`,
               "success"
             );
             await cache.delete("latest-shared-audio");
@@ -204,10 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!apiKey) {
-      setStatus(
-        "Error: OpenAI API Key is not set. Please save it first.",
-        "error"
-      );
+      setStatus("Error: OpenAI API Key is not set.", "error");
       return;
     }
     if (!fileToProcess) {
@@ -229,9 +243,8 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("MP3 file detected. No conversion needed.", "info");
     } else {
       try {
-        finalFileForApi = await convertToMp3(fileToProcess); // This calls ensureFFmpegLoaded internally
+        finalFileForApi = await convertToMp3(fileToProcess);
       } catch (conversionError) {
-        // Status is already set by convertToMp3 on error
         transcribeButton.disabled = false;
         return;
       }
@@ -250,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
             content: [
               {
                 type: "text",
-                text: "Transcribe an audio file into text in the Russian language.\n\n# Steps...\n\n# Output Format...\n\n# Notes...", // Keep your detailed system prompt
+                text: "Transcribe an audio file into text in the Russian language.\n\n# Steps...\n\n# Output Format...\n\n# Notes...", // Your system prompt
               },
             ],
           },
@@ -260,10 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
               { type: "text", text: "" },
               {
                 type: "input_audio",
-                input_audio: {
-                  data: pureBase64,
-                  format: "mp3", // Always sending as MP3 after conversion
-                },
+                input_audio: { data: pureBase64, format: "mp3" },
               },
             ],
           },
@@ -311,7 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         console.error("Unexpected API response structure:", data);
         setStatus(
-          "Error: Could not extract transcription from API response. Check console.",
+          "Error: Could not extract transcription from API response.",
           "error"
         );
       }
@@ -350,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share"; // Define it once
+      const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
       navigator.serviceWorker
         .register("./service-worker.js", {
           scope: `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/`,
