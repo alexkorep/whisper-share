@@ -129,3 +129,25 @@ button:disabled {
     font-size: 1.5em;
   }
 }
+
+#sharedFileInfo {
+  border: 1px dashed #007bff;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #e7f3ff;
+  border-radius: 4px;
+}
+
+#sharedFileInfo p {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+#sharedFileInfo button {
+  background-color: #6c757d;
+  font-size: 0.9em;
+  padding: 5px 10px;
+}
+#sharedFileInfo button:hover {
+  background-color: #5a6268;
+}

@@ -6,8 +6,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const transcribeButton = document.getElementById("transcribeButton");
   const transcriptionOutput = document.getElementById("transcriptionOutput");
   const statusDiv = document.getElementById("status");
+  const sharedFileInfoDiv = document.createElement("div"); // For displaying shared file info
+  sharedFileInfoDiv.id = "sharedFileInfo";
+  audioFileInput.parentNode.insertBefore(
+    sharedFileInfoDiv,
+    audioFileInput.nextSibling
+  );
 
   const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_transcriber";
+  const SHARED_FILES_CACHE_NAME_CLIENT =
+    "audio-transcriber-pwa-shared-files-v1"; // Must match SW
+  let sharedFileFromCache = null; // To store the File object retrieved from share target
 
   // Load API Key from localStorage
   function loadApiKey() {
@@ -22,7 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Save API Key to localStorage
   saveApiKeyButton.addEventListener("click", () => {
     const key = apiKeyInput.value.trim();
     if (key) {
@@ -36,9 +44,98 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  async function handleSharedFile() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("shared") || urlParams.has("error")) {
+      // Check for 'error' too
+      if (urlParams.has("error")) {
+        const errorType = urlParams.get("error");
+        setStatus(
+          `Error during share: ${errorType}. Please try again.`,
+          "error"
+        );
+      }
+      if (urlParams.has("shared")) {
+        setStatus("Attempting to load shared file...", "loading");
+        try {
+          if (!("caches" in window)) {
+            setStatus(
+              "Error: Cache API not available to retrieve shared file.",
+              "error"
+            );
+            return;
+          }
+          const cache = await caches.open(SHARED_FILES_CACHE_NAME_CLIENT);
+          const response = await cache.match("latest-shared-audio");
+
+          if (response) {
+            const originalFilename = decodeURIComponent(
+              response.headers.get("X-Original-Filename") || "shared_audio.m4a"
+            );
+            const contentType =
+              response.headers.get("Content-Type") || "audio/m4a";
+            const audioBlob = await response.blob();
+
+            sharedFileFromCache = new File([audioBlob], originalFilename, {
+              type: contentType,
+            });
+
+            // We can't set the value of a file input programmatically for security reasons.
+            // So, we'll display info about the shared file and use sharedFileFromCache directly.
+            audioFileInput.style.display = "none"; // Hide the original file input
+            sharedFileInfoDiv.innerHTML = `
+                            <p><strong>Shared file loaded:</strong> ${
+                              sharedFileFromCache.name
+                            } (${(sharedFileFromCache.size / 1024).toFixed(
+              2
+            )} KB)</p>
+                            <button id="clearSharedFile">Choose a different file</button>
+                        `;
+            document
+              .getElementById("clearSharedFile")
+              .addEventListener("click", () => {
+                sharedFileFromCache = null;
+                audioFileInput.value = ""; // Clear file input
+                audioFileInput.style.display = "block";
+                sharedFileInfoDiv.innerHTML = "";
+                setStatus("Shared file cleared. Select a new file.", "info");
+              });
+
+            setStatus(
+              `Shared file "${sharedFileFromCache.name}" loaded. Ready to transcribe.`,
+              "success"
+            );
+            await cache.delete("latest-shared-audio"); // Clean up the cache
+            console.log(
+              "Shared file loaded from cache and cache entry deleted."
+            );
+          } else {
+            setStatus(
+              "No shared file found in cache. It might have been processed already or failed to save.",
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Error retrieving shared file from cache:", error);
+          setStatus(`Error retrieving shared file: ${error.message}`, "error");
+        }
+      }
+      // Clean the URL (remove ?shared=true or ?error=...) without reloading
+      const cleanUrl = window.location.pathname + window.location.hash;
+      history.replaceState(null, "", cleanUrl);
+    }
+  }
+
   transcribeButton.addEventListener("click", async () => {
     const apiKey = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY);
-    const file = audioFileInput.files[0];
+    let fileToTranscribe = null;
+
+    if (sharedFileFromCache) {
+      fileToTranscribe = sharedFileFromCache;
+      setStatus(`Using shared file: ${fileToTranscribe.name}`, "info");
+    } else if (audioFileInput.files[0]) {
+      fileToTranscribe = audioFileInput.files[0];
+    }
 
     if (!apiKey) {
       setStatus(
@@ -48,18 +145,29 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (!file) {
-      setStatus("Error: No audio file selected.", "error");
+    if (!fileToTranscribe) {
+      setStatus("Error: No audio file selected or shared.", "error");
       return;
     }
 
     if (
-      file.type !== "audio/m4a" &&
-      !file.name.toLowerCase().endsWith(".m4a")
+      !fileToTranscribe.type.startsWith("audio/m4a") &&
+      !fileToTranscribe.name.toLowerCase().endsWith(".m4a")
     ) {
-      setStatus("Error: Please select an M4A audio file.", "error");
-      // Note: The API might still process it if it's M4A internally,
-      // but this client-side check is good practice.
+      // The API might be more lenient, but this is a client-side check
+      console.warn(
+        "Warning: Selected file may not be M4A, but attempting transcription.",
+        fileToTranscribe.type,
+        fileToTranscribe.name
+      );
+      // Allow if it's audio/* for broader compatibility, as share target might give generic audio type
+      if (!fileToTranscribe.type.startsWith("audio/")) {
+        setStatus(
+          "Error: Please select an M4A or compatible audio file.",
+          "error"
+        );
+        return;
+      }
     }
 
     setStatus("Processing audio... Please wait.", "loading");
@@ -67,12 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
     transcriptionOutput.value = "";
 
     try {
-      const base64Audio = await readFileAsBase64(file);
-      // Remove the data URL prefix (e.g., "data:audio/m4a;base64,")
+      const base64Audio = await readFileAsBase64(fileToTranscribe);
       const pureBase64 = base64Audio.split(",")[1];
 
       const requestBody = {
-        model: "gpt-4o-mini-audio-preview", // As per your curl example
+        model: "gpt-4o-mini-audio-preview",
         messages: [
           {
             role: "system",
@@ -86,38 +193,21 @@ document.addEventListener("DOMContentLoaded", () => {
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: "", // Empty text part as per example
-              },
+              { type: "text", text: "" },
               {
                 type: "input_audio",
-                input_audio: {
-                  data: pureBase64,
-                  format: "m4a", // Correct format for m4a files
-                },
+                input_audio: { data: pureBase64, format: "m4a" },
               },
             ],
           },
         ],
-        // modalities: ["text"], // This field might not be needed or could be different for gpt-4o-mini.
-        // The provided curl had it. Let's include it.
-        // If it causes issues, try removing it.
-        // Update: The example uses "gpt-4o-mini-audio-preview" which is newer
-        // and might require this. Keeping it based on your curl.
-        modalities: ["text"], // According to your example
-        temperature: 1, // As per example
-        max_completion_tokens: 16384, // As per example, can be adjusted
-        top_p: 1, // As per example
-        frequency_penalty: 0, // As per example
-        presence_penalty: 0, // As per example
+        modalities: ["text"],
+        temperature: 1,
+        max_completion_tokens: 16384,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
       };
-
-      // If you want to ensure the `modalities` field is only present for models that support it,
-      // you might add a check, but for gpt-4o-mini-audio-preview, it seems to be expected.
-      // if (requestBody.model.includes("vision") || requestBody.model.includes("audio")) {
-      //     requestBody.modalities = ["text"]; // or other relevant modalities
-      // }
 
       const response = await fetch(
         "https://api.openai.com/v1/chat/completions",
@@ -174,36 +264,41 @@ document.addEventListener("DOMContentLoaded", () => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file); // Reads as Base64 encoded data URL
+      reader.readAsDataURL(file);
     });
   }
 
   function setStatus(message, type = "info") {
-    // type can be 'info', 'success', 'error', 'loading'
     statusDiv.textContent = message;
-    statusDiv.className = type; // Allows CSS to style based on status type
+    statusDiv.className = type;
   }
 
   // Initial load
   loadApiKey();
-  if (!localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY)) {
+  handleSharedFile(); // Check for shared files on load
+  if (
+    !localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) &&
+    !sharedFileFromCache
+  ) {
     setStatus("Please enter and save your OpenAI API Key.", "info");
   }
-});
 
-// Service Worker registration
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("./service-worker.js")
-      .then((registration) => {
-        console.log(
-          "ServiceWorker registration successful with scope: ",
-          registration.scope
-        );
-      })
-      .catch((error) => {
-        console.log("ServiceWorker registration failed: ", error);
-      });
-  });
-}
+  // Service Worker registration
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("./service-worker.js", {
+          scope: `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/`,
+        }) // Explicit scope
+        .then((registration) => {
+          console.log(
+            "ServiceWorker registration successful with scope: ",
+            registration.scope
+          );
+        })
+        .catch((error) => {
+          console.log("ServiceWorker registration failed: ", error);
+        });
+    });
+  }
+});
