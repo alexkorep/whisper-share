@@ -334,10 +334,8 @@ async function initializeApp() {
   /*** ---------- SERVICE WORKER ---------- ***/
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      const viteBase = import.meta.env.BASE_URL || '/'; // Get base from Vite
-      const workerUrl = new URL('service-worker.js', new URL(viteBase, window.location.origin)).href;
       navigator.serviceWorker
-        .register(workerUrl, { scope: viteBase }) // Use viteBase for scope
+        .register("./service-worker.js", { scope: "/whisper-share/" })
         .then((registration) => {
           console.log("ServiceWorker registration successful with scope: ", registration.scope);
         })
