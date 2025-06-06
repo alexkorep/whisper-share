@@ -6,13 +6,13 @@ console.log("SW: Service worker script loaded, version v3");
 const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
 
 const urlsToCacheForAppShell = [
-  "./",
-  "./index.html",
-  "./style.css",
-  "./app.js",
-  "./manifest.json",
-  "./icon-192x192.png",
-  "./icon-512x512.png",
+  // "./",
+  // "./index.html",
+  // "./style.css",
+  // "./app.js",
+  // "./manifest.json",
+  // "./icon-192x192.png",
+  // "./icon-512x512.png",
 ];
 
 const SHARE_TARGET_ACTION_PATH = `/whisper-share/receive-audio`;
