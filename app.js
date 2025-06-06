@@ -47,12 +47,19 @@ async function initializeApp() {
     });
 
     try {
-      // Use URLs that work with Vite's dev server
-      const baseURL = import.meta.env.BASE_URL || '/';
-      await ffmpeg.load({
-        coreURL: `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js`,
-        wasmURL: `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm`,
-      });
+      let coreURL, wasmURL;
+      if (import.meta.env.DEV) {
+        // Development: use node_modules path
+        const baseURL = import.meta.env.BASE_URL || '/';
+        coreURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js`;
+        wasmURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm`;
+      } else {
+        // Production: use files copied to dist root
+        const baseURL = import.meta.env.BASE_URL || '/';
+        coreURL = `${window.location.origin}${baseURL}ffmpeg-core.js`;
+        wasmURL = `${window.location.origin}${baseURL}ffmpeg-core.wasm`;
+      }
+      await ffmpeg.load({ coreURL, wasmURL });
       ffmpegLoaded = true;
       setStatus("FFmpeg engine ready.", "success");
     } catch (err) {
