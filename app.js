@@ -1,30 +1,9 @@
 // app.js
 // Uses the factory API introduced in @ffmpeg/ffmpeg 0.12.x
-// The FFmpeg UMD bundle is loaded in index.html and exposes
-//   window.FFmpeg.createFFmpeg   – factory that returns an FFmpeg instance
-//   window.FFmpeg.fetchFile      – helper that converts File/Blob/URL → Uint8Array
-
-// Wait for both DOM and FFmpeg to be ready
-async function waitForFFmpeg() {
-  return new Promise((resolve) => {
-    const checkFFmpeg = () => {
-      if (
-        window.FFmpeg &&
-        window.FFmpeg.createFFmpeg &&
-        window.FFmpeg.fetchFile
-      ) {
-        resolve();
-      } else {
-        setTimeout(checkFFmpeg, 100);
-      }
-    };
-    checkFFmpeg();
-  });
-}
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile } from "@ffmpeg/util";
 
 async function initializeApp() {
-  // Wait for FFmpeg to be available
-  await waitForFFmpeg();
 
   /*** ---------- DOM ELEMENTS ---------- ***/
   const apiKeyInput = document.getElementById("apiKey");
@@ -52,30 +31,28 @@ async function initializeApp() {
   let ffmpegLoaded = false; // Flag so we only load once
 
   /*** ---------- FFmpeg HELPERS ---------- ***/
-  // Grab helpers that the UMD bundle puts on window.FFmpeg
-  const { createFFmpeg, fetchFile } = window.FFmpeg;
 
   async function ensureFFmpegLoaded() {
     if (ffmpegLoaded) return;
 
     setStatus("Loading FFmpeg core (~30 MB)…", "loading");
-    ffmpeg = createFFmpeg({
-      log: false, // set true for verbose logs
-      corePath: "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd",
-    });
-
-    // Progress events (ratio 0-1)
-    ffmpeg.setProgress(({ ratio }) => {
-      if (ratio > 0 && ratio < 1) {
+    ffmpeg = new FFmpeg();
+    ffmpeg.on("progress", ({ progress }) => {
+      if (progress > 0 && progress < 1) {
         setStatus(
-          `Conversion progress: ${(ratio * 100).toFixed(1)} %`,
+          `Conversion progress: ${(progress * 100).toFixed(1)} %`,
           "loading"
         );
       }
     });
 
     try {
-      await ffmpeg.load();
+      await ffmpeg.load({
+        coreURL: new URL(
+          "./node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js",
+          import.meta.url
+        ).href,
+      });
       ffmpegLoaded = true;
       setStatus("FFmpeg engine ready.", "success");
     } catch (err) {
@@ -94,18 +71,18 @@ async function initializeApp() {
     setStatus(`Converting "${inputName}" to MP3…`, "loading");
 
     try {
-      // Write the source file into FFmpeg's MEMFS
-      await ffmpeg.FS("writeFile", inputName, await fetchFile(inputFile));
+      // Write the source file into FFmpeg's virtual FS
+      await ffmpeg.writeFile(inputName, await fetchFile(inputFile));
 
       // Transcode
-      await ffmpeg.run("-i", inputName, outputName);
+      await ffmpeg.exec(["-i", inputName, outputName]);
 
-      // Read the resulting file back from MEMFS
-      const data = ffmpeg.FS("readFile", outputName); // Uint8Array
+      // Read the resulting file back from the virtual FS
+      const data = await ffmpeg.readFile(outputName);
 
-      // Clean up MEMFS
-      ffmpeg.FS("unlink", inputName);
-      ffmpeg.FS("unlink", outputName);
+      // Clean up virtual FS
+      await ffmpeg.deleteFile(inputName);
+      await ffmpeg.deleteFile(outputName);
 
       setStatus(`Conversion of "${inputName}" complete.`, "success");
       return new File([data.buffer], "converted.mp3", { type: "audio/mpeg" });
@@ -114,10 +91,10 @@ async function initializeApp() {
       setStatus(`Error converting "${inputName}": ${err.message}`, "error");
       // Attempt cleanup but ignore errors
       try {
-        ffmpeg.FS("unlink", inputName);
+        await ffmpeg.deleteFile(inputName);
       } catch {}
       try {
-        ffmpeg.FS("unlink", outputName);
+        await ffmpeg.deleteFile(outputName);
       } catch {}
       throw err;
     }
