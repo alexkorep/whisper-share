@@ -1,7 +1,7 @@
-const APP_SHELL_CACHE_NAME = "audio-transcriber-pwa-app-shell-v2"; // Updated version to force refresh
+const APP_SHELL_CACHE_NAME = "audio-transcriber-pwa-app-shell-v3"; // Updated version to force refresh
 const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
 
-console.log("SW: Service worker script loaded, version v2");
+console.log("SW: Service worker script loaded, version v3");
 
 const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
 
@@ -19,14 +19,17 @@ const SHARE_TARGET_ACTION_PATH = `/whisper-share/receive-audio`;
 const REDIRECT_URL_AFTER_SHARE = `/whisper-share/index.html?shared=true`;
 
 self.addEventListener("install", (event) => {
-  console.log("SW: Installing service worker");
+  console.log("SW: Installing service worker v2");
   event.waitUntil(
     caches
       .open(APP_SHELL_CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCacheForAppShell))
       .catch((err) => console.error("App shell cache addAll failed:", err))
+      .then(() => {
+        console.log("SW: Force skipping waiting");
+        return self.skipWaiting();
+      })
   );
-  self.skipWaiting(); // Force activation
 });
 
 self.addEventListener("activate", (event) => {
@@ -51,21 +54,39 @@ self.addEventListener("activate", (event) => {
         console.log("SW: Claiming clients");
         return self.clients.claim();
       })
+      .then(() => {
+        console.log("SW: Service worker is now controlling all clients");
+        // Notify all clients that service worker is ready
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({
+              type: 'SW_READY',
+              message: 'Service worker is ready and controlling this page'
+            });
+          });
+        });
+      })
   );
 });
 
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   
-  // Debug logging
-  console.log("SW: Fetch event for:", requestUrl.pathname, "Method:", event.request.method);
+  // Debug logging for ALL requests
+  console.log("SW: Fetch event for:", requestUrl.href);
+  console.log("SW: Pathname:", requestUrl.pathname);
+  console.log("SW: Method:", event.request.method);
   console.log("SW: Looking for:", SHARE_TARGET_ACTION_PATH);
+  
+  // Check if this is our share target request
+  const isShareTarget = (
+    requestUrl.pathname === SHARE_TARGET_ACTION_PATH ||
+    requestUrl.pathname === `/whisper-share/receive-audio` ||
+    requestUrl.href.includes('/whisper-share/receive-audio')
+  ) && event.request.method === "POST";
 
-  if (
-    requestUrl.pathname === SHARE_TARGET_ACTION_PATH &&
-    event.request.method === "POST"
-  ) {
-    console.log("SW: Intercepting share target POST request");
+  if (isShareTarget) {
+    console.log("SW: ✅ Intercepting share target POST request");
     event.respondWith(
       (async () => {
         try {
@@ -87,13 +108,14 @@ self.addEventListener("fetch", (event) => {
             );
             return Response.redirect(REDIRECT_URL_AFTER_SHARE, 303);
           } else {
+            console.log("SW: ❌ No file found in form data");
             return Response.redirect(
               REDIRECT_URL_AFTER_SHARE + "&error=share_failed_no_file",
               303
             );
           }
         } catch (error) {
-          console.error("SW: Error handling share target:", error);
+          console.error("SW: ❌ Error handling share target:", error);
           return Response.redirect(
             REDIRECT_URL_AFTER_SHARE + "&error=share_processing_failed",
             303
@@ -102,6 +124,11 @@ self.addEventListener("fetch", (event) => {
       })()
     );
     return;
+  }
+
+  // Log non-share requests for debugging
+  if (event.request.method === "POST") {
+    console.log("SW: ⚠️ POST request not intercepted:", requestUrl.href);
   }
 
   if (

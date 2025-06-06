@@ -338,10 +338,31 @@ async function initializeApp() {
         .register("./service-worker.js", { scope: "/whisper-share/" })
         .then((registration) => {
           console.log("ServiceWorker registration successful with scope: ", registration.scope);
+          
+          // Check if page is controlled by service worker
+          if (navigator.serviceWorker.controller) {
+            console.log("✅ Page is controlled by service worker");
+          } else {
+            console.log("⚠️ Page is NOT controlled by service worker");
+          }
         })
         .catch((error) => {
           console.log("ServiceWorker registration failed: ", error);
         });
+        
+      // Listen for service worker controller changes
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log("Service worker controller changed");
+        window.location.reload();
+      });
+      
+      // Listen for messages from service worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('Message from SW:', event.data);
+        if (event.data.type === 'SW_READY') {
+          console.log('✅ Service worker is ready and controlling the page');
+        }
+      });
     });
   }
 }
