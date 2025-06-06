@@ -43,10 +43,12 @@
       </div>
     </div>
 
-    <!-- Load FFMPEG UMD library directly -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.9/dist/umd/ffmpeg.js"></script>
+    <script
+      src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.9/dist/umd/ffmpeg.js"
+      defer
+      crossorigin="anonymous"
+    ></script>
 
-    <!-- app.js will still be a module to organize its code and potentially use other imports if needed -->
     <script type="module" src="app.js"></script>
   </body>
 </html>

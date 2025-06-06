@@ -1,7 +1,32 @@
 // app.js
-// FFmpeg class is loaded globally via script tag in index.html as window.FFmpeg.FFmpeg
+// Uses the factory API introduced in @ffmpeg/ffmpeg 0.12.x
+// The FFmpeg UMD bundle is loaded in index.html and exposes
+//   window.FFmpeg.createFFmpeg   – factory that returns an FFmpeg instance
+//   window.FFmpeg.fetchFile      – helper that converts File/Blob/URL → Uint8Array
 
-document.addEventListener("DOMContentLoaded", () => {
+// Wait for both DOM and FFmpeg to be ready
+async function waitForFFmpeg() {
+  return new Promise((resolve) => {
+    const checkFFmpeg = () => {
+      if (
+        window.FFmpeg &&
+        window.FFmpeg.createFFmpeg &&
+        window.FFmpeg.fetchFile
+      ) {
+        resolve();
+      } else {
+        setTimeout(checkFFmpeg, 100);
+      }
+    };
+    checkFFmpeg();
+  });
+}
+
+async function initializeApp() {
+  // Wait for FFmpeg to be available
+  await waitForFFmpeg();
+
+  /*** ---------- DOM ELEMENTS ---------- ***/
   const apiKeyInput = document.getElementById("apiKey");
   const saveApiKeyButton = document.getElementById("saveApiKey");
   const apiKeyStatus = document.getElementById("apiKeyStatus");
@@ -9,160 +34,106 @@ document.addEventListener("DOMContentLoaded", () => {
   const transcribeButton = document.getElementById("transcribeButton");
   const transcriptionOutput = document.getElementById("transcriptionOutput");
   const statusDiv = document.getElementById("status");
+
   const sharedFileInfoDiv = document.createElement("div");
   sharedFileInfoDiv.id = "sharedFileInfo";
-  if (audioFileInput.parentNode) {
-    audioFileInput.parentNode.insertBefore(
-      sharedFileInfoDiv,
-      audioFileInput.nextSibling
-    );
-  }
+  audioFileInput.parentNode?.insertBefore(
+    sharedFileInfoDiv,
+    audioFileInput.nextSibling
+  );
 
+  /*** ---------- CONSTANTS ---------- ***/
   const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_transcriber";
-  const SHARED_FILES_CACHE_NAME_CLIENT =
-    "audio-transcriber-pwa-shared-files-v1";
-  let sharedFileFromCache = null;
+  const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
 
-  // FFMPEG setup
-  let ffmpegInstance = null;
-  let ffmpegLoaded = false;
+  /*** ---------- STATE ---------- ***/
+  let sharedFileFromCache = null; // File loaded via Web-Share-Target
+  let ffmpeg = null; // FFmpeg instance (lazy-loaded)
+  let ffmpegLoaded = false; // Flag so we only load once
 
-  // Correct way to access fetchFile when FFmpeg UMD is loaded:
-  // It's often under FFmpeg.util.fetchFile
-  // Or ensure your UMD build exposes it as expected.
-  // Let's assume it's available directly on the FFmpeg object exported by UMD,
-  // or under a 'util' namespace.
-  // The createFFmpeg function itself (which we are not using now) would return an object with fetchFile.
-  // The global `window.FFmpeg` object from the UMD build is `ffmpeg.js` itself.
-  // Its `fetchFile` utility is usually `window.FFmpeg.fetchFile` or `window.FFmpeg.utils.fetchFile`.
-  // Given your error, `window.FFmpeg.fetchFile` is likely undefined.
-
-  // From the error, `window.FFmpeg` itself is the object created by the UMD script.
-  // If `fetchFile` isn't directly on it, it might be on an older API or a submodule.
-  // Let's check the documentation/source for @ffmpeg/ffmpeg@0.12.9 UMD.
-  // Looking at the UMD output for 0.12.9, it does put fetchFile directly on the exported object.
-  // The issue might be that window.FFmpeg is not yet populated when that line is executed.
-  // Let's defer accessing it.
-
-  let localFetchFile; // We will assign this inside ensureFFmpegLoaded
+  /*** ---------- FFmpeg HELPERS ---------- ***/
+  // Grab helpers that the UMD bundle puts on window.FFmpeg
+  const { createFFmpeg, fetchFile } = window.FFmpeg;
 
   async function ensureFFmpegLoaded() {
-    if (!window.FFmpeg || !window.FFmpeg.FFmpeg) {
-      const errMsg =
-        "Error: FFMPEG library or FFmpeg class not found. Check script tag in HTML.";
-      console.error(errMsg);
-      setStatus(errMsg, "error");
-      throw new Error(errMsg);
-    }
+    if (ffmpegLoaded) return;
 
-    // Assign fetchFile here, once we know window.FFmpeg is available
-    if (!localFetchFile && window.FFmpeg.fetchFile) {
-      localFetchFile = window.FFmpeg.fetchFile;
-    } else if (!localFetchFile) {
-      // Fallback or error if fetchFile is still not found where expected
-      // This might happen if the UMD structure is different than assumed.
-      // For @ffmpeg/ffmpeg@0.12.9 UMD, `window.FFmpeg.fetchFile` should be correct.
-      const errMsg =
-        "Error: FFmpeg.fetchFile utility not found. Library may have loaded incorrectly.";
-      console.error(errMsg);
-      setStatus(errMsg, "error");
-      throw new Error(errMsg);
-    }
+    setStatus("Loading FFmpeg core (~30 MB)…", "loading");
+    ffmpeg = createFFmpeg({
+      log: false, // set true for verbose logs
+      corePath: "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd",
+    });
 
-    if (!ffmpegLoaded) {
-      setStatus(
-        "Loading FFMPEG conversion engine (core ~30MB, one-time download)...",
-        "loading"
-      );
-      try {
-        ffmpegInstance = new window.FFmpeg.FFmpeg();
-        ffmpegInstance.on("log", ({ type, message }) => {
-          // console.log(`FFMPEG [${type}]: ${message}`); // Verbose
-        });
-        // Listen for progress if needed
-        ffmpegInstance.on("progress", ({ progress, time }) => {
-          if (progress > 0 && progress < 1) {
-            // Avoid logging 0 and 1 for brevity
-            setStatus(
-              `Conversion progress: ${(progress * 100).toFixed(1)}%`,
-              "loading"
-            );
-          }
-        });
-
-        await ffmpegInstance.load({
-          coreURL:
-            "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd/ffmpeg-core.js",
-          wasmURL:
-            "https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd/ffmpeg-core.wasm",
-        });
-        ffmpegLoaded = true;
-        setStatus("FFMPEG engine loaded.", "success");
-      } catch (error) {
-        console.error("FFMPEG loading failed:", error);
+    // Progress events (ratio 0-1)
+    ffmpeg.setProgress(({ ratio }) => {
+      if (ratio > 0 && ratio < 1) {
         setStatus(
-          "Error: FFMPEG engine failed to load. Conversion not possible.",
-          "error"
+          `Conversion progress: ${(ratio * 100).toFixed(1)} %`,
+          "loading"
         );
-        ffmpegInstance = null;
-        throw error;
       }
+    });
+
+    try {
+      await ffmpeg.load();
+      ffmpegLoaded = true;
+      setStatus("FFmpeg engine ready.", "success");
+    } catch (err) {
+      console.error("FFmpeg failed to load:", err);
+      setStatus("Error: FFmpeg engine could not be loaded.", "error");
+      throw err;
     }
   }
 
   async function convertToMp3(inputFile) {
-    if (!ffmpegInstance || !ffmpegLoaded) {
-      await ensureFFmpegLoaded();
-    }
-    // Ensure localFetchFile is available
-    if (!localFetchFile) {
-      await ensureFFmpegLoaded(); // This will try to assign it or throw
-    }
+    await ensureFFmpegLoaded();
 
-    setStatus(
-      `Converting "${inputFile.name}" to MP3... Please wait.`,
-      "loading"
-    );
+    const inputName = inputFile.name || "input";
+    const outputName = "output.mp3";
 
-    const inputFileName = inputFile.name || "inputfile";
-    const outputFileName = "output.mp3";
+    setStatus(`Converting "${inputName}" to MP3…`, "loading");
 
     try {
-      await ffmpegInstance.writeFile(
-        inputFileName,
-        await localFetchFile(inputFile)
-      ); // Use localFetchFile
-      await ffmpegInstance.exec(["-i", inputFileName, outputFileName]);
-      const data = await ffmpegInstance.readFile(outputFileName);
+      // Write the source file into FFmpeg's MEMFS
+      await ffmpeg.FS("writeFile", inputName, await fetchFile(inputFile));
 
-      await ffmpegInstance.deleteFile(inputFileName);
-      await ffmpegInstance.deleteFile(outputFileName);
+      // Transcode
+      await ffmpeg.run("-i", inputName, outputName);
 
-      setStatus(
-        `Conversion of "${inputFile.name}" to MP3 successful.`,
-        "success"
-      );
+      // Read the resulting file back from MEMFS
+      const data = ffmpeg.FS("readFile", outputName); // Uint8Array
+
+      // Clean up MEMFS
+      ffmpeg.FS("unlink", inputName);
+      ffmpeg.FS("unlink", outputName);
+
+      setStatus(`Conversion of "${inputName}" complete.`, "success");
       return new File([data.buffer], "converted.mp3", { type: "audio/mpeg" });
-    } catch (error) {
-      console.error("Error during FFMPEG conversion:", error);
-      setStatus(
-        `Error converting "${inputFile.name}" to MP3: ${error.message}`,
-        "error"
-      );
+    } catch (err) {
+      console.error("FFmpeg conversion error:", err);
+      setStatus(`Error converting "${inputName}": ${err.message}`, "error");
+      // Attempt cleanup but ignore errors
       try {
-        await ffmpegInstance.deleteFile(inputFileName);
-      } catch (e) {}
+        ffmpeg.FS("unlink", inputName);
+      } catch {}
       try {
-        await ffmpegInstance.deleteFile(outputFileName);
-      } catch (e) {}
-      throw error;
+        ffmpeg.FS("unlink", outputName);
+      } catch {}
+      throw err;
     }
   }
 
+  /*** ---------- UI STATE HELPERS ---------- ***/
+  function setStatus(msg, type = "info") {
+    statusDiv.textContent = msg;
+    statusDiv.className = type; // CSS classes .info .loading .success .error
+    if (type !== "loading") console.log(`Status [${type}]: ${msg}`);
+  }
+
   function loadApiKey() {
-    const storedKey = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY);
-    if (storedKey) {
-      apiKeyInput.value = storedKey;
+    const key = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY);
+    if (key) {
+      apiKeyInput.value = key;
       apiKeyStatus.textContent = "API Key loaded from storage.";
       apiKeyStatus.className = "status-message success";
     } else {
@@ -171,6 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /*** ---------- EVENT LISTENERS ---------- ***/
   saveApiKeyButton.addEventListener("click", () => {
     const key = apiKeyInput.value.trim();
     if (key) {
@@ -184,117 +156,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  async function handleSharedFile() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has("shared") || urlParams.has("error")) {
-      if (urlParams.has("error")) {
-        const errorType = urlParams.get("error");
-        setStatus(
-          `Error during share: ${errorType}. Please try again.`,
-          "error"
-        );
-      }
-      if (urlParams.has("shared")) {
-        setStatus("Attempting to load shared file...", "loading");
-        try {
-          if (!("caches" in window)) {
-            setStatus("Error: Cache API not available.", "error");
-            return;
-          }
-          const cache = await caches.open(SHARED_FILES_CACHE_NAME_CLIENT);
-          const response = await cache.match("latest-shared-audio");
-          if (response) {
-            const originalFilename = decodeURIComponent(
-              response.headers.get("X-Original-Filename") || "shared_audio.file"
-            );
-            const contentType =
-              response.headers.get("Content-Type") ||
-              "application/octet-stream";
-            const audioBlob = await response.blob();
-            sharedFileFromCache = new File([audioBlob], originalFilename, {
-              type: contentType,
-            });
-            audioFileInput.style.display = "none";
-            sharedFileInfoDiv.innerHTML = `
-                            <p><strong>Shared file loaded:</strong> ${
-                              sharedFileFromCache.name
-                            } (${(sharedFileFromCache.size / 1024).toFixed(
-              2
-            )} KB)</p>
-                            <button id="clearSharedFile">Choose a different file</button>`;
-            document
-              .getElementById("clearSharedFile")
-              .addEventListener("click", () => {
-                sharedFileFromCache = null;
-                audioFileInput.value = "";
-                audioFileInput.style.display = "block";
-                sharedFileInfoDiv.innerHTML = "";
-                setStatus("Shared file cleared.", "info");
-              });
-            setStatus(
-              `Shared file "${sharedFileFromCache.name}" loaded.`,
-              "success"
-            );
-            await cache.delete("latest-shared-audio");
-          } else {
-            setStatus("No shared file found in cache.", "info");
-          }
-        } catch (error) {
-          console.error("Error retrieving shared file:", error);
-          setStatus(`Error retrieving shared file: ${error.message}`, "error");
-        }
-      }
-      const cleanUrl = window.location.pathname + window.location.hash;
-      history.replaceState(null, "", cleanUrl);
-    }
-  }
-
   transcribeButton.addEventListener("click", async () => {
     const apiKey = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY);
-    let fileToProcess = null;
-
-    if (sharedFileFromCache) {
-      fileToProcess = sharedFileFromCache;
-    } else if (audioFileInput.files[0]) {
-      fileToProcess = audioFileInput.files[0];
-    }
+    let file = sharedFileFromCache || audioFileInput.files[0];
 
     if (!apiKey) {
       setStatus("Error: OpenAI API Key is not set.", "error");
       return;
     }
-    if (!fileToProcess) {
+    if (!file) {
       setStatus("Error: No audio file selected or shared.", "error");
       return;
     }
 
-    setStatus("Preparing audio file...", "loading");
     transcribeButton.disabled = true;
     transcriptionOutput.value = "";
+    setStatus("Preparing audio file…", "loading");
 
-    let finalFileForApi;
-    const isMp3 =
-      fileToProcess.type === "audio/mpeg" ||
-      fileToProcess.name.toLowerCase().endsWith(".mp3");
-
-    if (isMp3) {
-      finalFileForApi = fileToProcess;
-      setStatus("MP3 file detected. No conversion needed.", "info");
-    } else {
+    // Convert if necessary
+    let mp3File = file;
+    if (
+      !file.type === "audio/mpeg" &&
+      !file.name.toLowerCase().endsWith(".mp3")
+    ) {
       try {
-        finalFileForApi = await convertToMp3(fileToProcess);
-      } catch (conversionError) {
+        mp3File = await convertToMp3(file);
+      } catch (e) {
         transcribeButton.disabled = false;
         return;
       }
+    } else {
+      setStatus("MP3 detected – no conversion needed.", "info");
     }
 
-    setStatus("Reading file data for API...", "loading");
+    /** ---- Send to OpenAI ---- **/
+    setStatus("Reading file data…", "loading");
     try {
-      const base64Audio = await readFileAsBase64(finalFileForApi);
-      const pureBase64 = base64Audio.split(",")[1];
-
-      const requestBody = {
+      const base64 = await readFileAsBase64(mp3File); // data: URI
+      const body = {
         model: "gpt-4o-mini-audio-preview",
         messages: [
           {
@@ -302,7 +201,12 @@ document.addEventListener("DOMContentLoaded", () => {
             content: [
               {
                 type: "text",
-                text: "Transcribe an audio file into text in the Russian language.\n\n# Steps\n\n1. Listen to the audio file carefully.\n2. Transcribe the spoken words into written text without altering the spoken content.\n3. Pay attention to grammatical nuances and punctuation in Russian.\n4. If specific terms, jargon, or unintelligible segments occur, note these with time-stamps if possible.\n\n# Output Format\n\n- The transcription should be provided as plain text, in Russian.\n- Ensure correct use of punctuation and capitalization according to Russian grammar rules.\n\n# Notes\n\n- If any portion of the audio is unclear, mark it as [unintelligible] and provide the timestamp.\n- Ensure the transcription is accurate and reflects the original speech faithfully.",
+                text: `Transcribe the following audio into Russian text.
+
+# Notes
+• Preserve speaker's wording.
+• Use correct punctuation/capitalisation.
+• For unclear segments mark [unintelligible] plus timestamp.`,
               },
             ],
           },
@@ -312,7 +216,10 @@ document.addEventListener("DOMContentLoaded", () => {
               { type: "text", text: "" },
               {
                 type: "input_audio",
-                input_audio: { data: pureBase64, format: "mp3" },
+                input_audio: {
+                  data: base64.split(",")[1], // strip "data:…;base64,"
+                  format: "mp3",
+                },
               },
             ],
           },
@@ -320,80 +227,120 @@ document.addEventListener("DOMContentLoaded", () => {
         modalities: ["text"],
         temperature: 1,
         max_completion_tokens: 16384,
-        top_p: 1,
-        frequency_penalty: 0,
-        presence_penalty: 0,
       };
 
-      setStatus("Sending to OpenAI for transcription...", "loading");
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
+      setStatus("Sending to OpenAI…", "loading");
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
 
-      if (!response.ok) {
-        const errorData = await response
+      if (!res.ok) {
+        const err = await res
           .json()
-          .catch(() => ({ error: { message: "Unknown API error structure" } }));
+          .catch(() => ({ error: { message: res.statusText } }));
         throw new Error(
-          `API Error (${response.status}): ${
-            errorData.error?.message || response.statusText
-          }`
+          `API ${res.status}: ${err.error?.message || res.statusText}`
         );
       }
-      const data = await response.json();
 
-      if (
-        data.choices &&
-        data.choices[0].message &&
-        data.choices[0].message.content
-      ) {
-        transcriptionOutput.value = data.choices[0].message.content;
-        setStatus("Transcription successful!", "success");
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) {
+        transcriptionOutput.value = text;
+        setStatus("Transcription complete!", "success");
       } else {
-        console.error("Unexpected API response structure:", data);
-        setStatus(
-          "Error: Could not extract transcription from API response.",
-          "error"
-        );
+        throw new Error("Unexpected response structure.");
       }
-    } catch (error) {
-      console.error("Transcription process error:", error);
-      setStatus(`Error: ${error.message}`, "error");
-      transcriptionOutput.value = `Error: ${error.message}`;
+    } catch (err) {
+      console.error("Transcription error:", err);
+      setStatus(`Error: ${err.message}`, "error");
+      transcriptionOutput.value = `Error: ${err.message}`;
     } finally {
       transcribeButton.disabled = false;
     }
   });
 
+  /*** ---------- WEB-SHARE-TARGET HANDLING ---------- ***/
+  async function handleSharedFile() {
+    const qp = new URLSearchParams(window.location.search);
+    if (!(qp.has("shared") || qp.has("error"))) return;
+
+    if (qp.has("error")) {
+      setStatus(`Error during share: ${qp.get("error")}`, "error");
+    }
+
+    if (qp.has("shared")) {
+      setStatus("Attempting to load shared file…", "loading");
+      try {
+        if (!("caches" in window)) {
+          setStatus("Error: Cache API not available.", "error");
+          return;
+        }
+        const cache = await caches.open(SHARED_FILES_CACHE_NAME);
+        const resp = await cache.match("latest-shared-audio");
+        if (resp) {
+          const origName = decodeURIComponent(
+            resp.headers.get("X-Original-Filename") || "shared_audio"
+          );
+          const type =
+            resp.headers.get("Content-Type") || "application/octet-stream";
+          const blob = await resp.blob();
+
+          sharedFileFromCache = new File([blob], origName, { type });
+          audioFileInput.style.display = "none";
+          sharedFileInfoDiv.innerHTML =
+            `<p><strong>Shared file:</strong> ${origName} (${(
+              blob.size / 1024
+            ).toFixed(1)} KB)</p>` +
+            `<button id="clearSharedFile">Choose a different file</button>`;
+
+          document
+            .getElementById("clearSharedFile")
+            .addEventListener("click", () => {
+              sharedFileFromCache = null;
+              audioFileInput.value = "";
+              audioFileInput.style.display = "block";
+              sharedFileInfoDiv.innerHTML = "";
+              setStatus("Shared file cleared.", "info");
+            });
+
+          setStatus(`Shared file "${origName}" loaded.`, "success");
+          await cache.delete("latest-shared-audio");
+        } else {
+          setStatus("No shared file found in cache.", "info");
+        }
+      } catch (err) {
+        console.error("Shared-file retrieval error:", err);
+        setStatus(`Error retrieving shared file: ${err.message}`, "error");
+      }
+    }
+    // Clean URL so a refresh doesn't repeat the share logic
+    history.replaceState(
+      null,
+      "",
+      window.location.pathname + window.location.hash
+    );
+  }
+
+  /*** ---------- UTIL ---------- ***/
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
     });
   }
 
-  function setStatus(message, type = "info") {
-    statusDiv.textContent = message;
-    statusDiv.className = type;
-    if (type !== "loading") {
-      // Avoid flooding console with progress updates
-      console.log(`Status [${type}]: ${message}`);
-    }
-  }
-
-  // Initial load
+  /*** ---------- INIT ---------- ***/
   loadApiKey();
-  handleSharedFile(); // Check for shared files
+  handleSharedFile();
+
   if (
     !localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) &&
     !sharedFileFromCache
@@ -401,23 +348,17 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Please enter and save your OpenAI API Key.", "info");
   }
 
-  // Service Worker registration
+  /*** ---------- SERVICE WORKER ---------- ***/
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
+      const scopePath = "/whisper-share/"; // adjust if you change repo subdir
       navigator.serviceWorker
-        .register("./service-worker.js", {
-          scope: `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/`,
-        })
-        .then((registration) =>
-          console.log(
-            "ServiceWorker registration successful with scope: ",
-            registration.scope
-          )
-        )
-        .catch((error) =>
-          console.log("ServiceWorker registration failed: ", error)
-        );
+        .register("./service-worker.js", { scope: scopePath })
+        .then((r) => console.log("SW registered with scope:", r.scope))
+        .catch((e) => console.log("SW registration failed:", e));
     });
   }
-});
+}
+
+// Initialize the app when DOM is ready
+document.addEventListener("DOMContentLoaded", initializeApp);
