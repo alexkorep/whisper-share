@@ -20,7 +20,7 @@
     }
   ],
   "share_target": {
-    "action": "index.html?receive-audio=true",
+    "action": "/whisper-share/index.html?receive-audio=true",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
