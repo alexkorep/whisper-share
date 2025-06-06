@@ -14,6 +14,8 @@ async function initializeApp() {
   const transcriptionOutput = document.getElementById("transcriptionOutput");
   const statusDiv = document.getElementById("status");
 
+  const transcriptionHistoryDiv = document.getElementById("transcriptionHistory");
+
   const sharedFileInfoDiv = document.createElement("div");
   sharedFileInfoDiv.id = "sharedFileInfo";
   audioFileInput.parentNode?.insertBefore(
@@ -24,6 +26,8 @@ async function initializeApp() {
   /*** ---------- CONSTANTS ---------- ***/
   const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_transcriber";
   const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
+
+  const TRANSCRIPTION_HISTORY_KEY = "transcription_history";
 
   /*** ---------- STATE ---------- ***/
   let sharedFileFromCache = null; // File loaded via Web-Share-Target
@@ -112,6 +116,77 @@ async function initializeApp() {
     statusDiv.textContent = msg;
     statusDiv.className = type; // CSS classes .info .loading .success .error
     if (type !== "loading") console.log(`Status [${type}]: ${msg}`);
+  }
+
+  function saveTranscriptionToHistory({ filename, text }) {
+    const history = getTranscriptionHistory();
+    const entry = {
+      id: Date.now() + Math.random().toString(36).slice(2),
+      filename,
+      text,
+      date: new Date().toISOString(),
+    };
+    history.unshift(entry); // newest first
+    localStorage.setItem(TRANSCRIPTION_HISTORY_KEY, JSON.stringify(history));
+    renderTranscriptionHistory();
+  }
+
+  function getTranscriptionHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(TRANSCRIPTION_HISTORY_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function deleteTranscriptionFromHistory(id) {
+    let history = getTranscriptionHistory();
+    history = history.filter(entry => entry.id !== id);
+    localStorage.setItem(TRANSCRIPTION_HISTORY_KEY, JSON.stringify(history));
+    renderTranscriptionHistory();
+  }
+
+  function renderTranscriptionHistory() {
+    const history = getTranscriptionHistory();
+    if (!history.length) {
+      transcriptionHistoryDiv.innerHTML = '<p>No transcriptions saved yet.</p>';
+      return;
+    }
+    transcriptionHistoryDiv.innerHTML = history.map(entry => `
+      <div class="history-entry" data-id="${entry.id}">
+        <div class="history-meta">
+          <strong>${entry.filename || 'Untitled'}</strong>
+          <span class="history-date">${new Date(entry.date).toLocaleString()}</span>
+        </div>
+        <textarea readonly rows="4">${entry.text.replace(/</g, '&lt;')}</textarea>
+        <button class="copy-history-btn" data-id="${entry.id}">Copy</button>
+        <button class="delete-history-btn" data-id="${entry.id}">Delete</button>
+      </div>
+    `).join('');
+
+    // Attach delete listeners
+    transcriptionHistoryDiv.querySelectorAll('.delete-history-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const id = btn.getAttribute('data-id');
+        if (confirm('Delete this transcription?')) {
+          deleteTranscriptionFromHistory(id);
+        }
+      });
+    });
+
+    // Attach copy listeners
+    transcriptionHistoryDiv.querySelectorAll('.copy-history-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const id = btn.getAttribute('data-id');
+        const entry = getTranscriptionHistory().find(e => e.id === id);
+        if (entry) {
+          navigator.clipboard.writeText(entry.text).then(() => {
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+          });
+        }
+      });
+    });
   }
 
   function loadApiKey() {
@@ -236,6 +311,8 @@ async function initializeApp() {
       if (text) {
         transcriptionOutput.value = text;
         setStatus("Transcription complete!", "success");
+        // Save to history
+        saveTranscriptionToHistory({ filename: file.name, text });
       } else {
         throw new Error("Unexpected response structure.");
       }
@@ -323,6 +400,8 @@ async function initializeApp() {
   /*** ---------- INIT ---------- ***/
   loadApiKey();
   handleSharedFile();
+
+  renderTranscriptionHistory();
 
   if (
     !localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) &&
