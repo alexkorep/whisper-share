@@ -9,9 +9,11 @@ A simple web app for sharing audio files and transcribing them with OpenAI Whisp
    npm install
    ```
 2. Start the development server with Vite:
+
    ```bash
    npm run dev
    ```
+
    Vite provides hot reload and allows you to import packages from npm.
 
 3. Build for production:
@@ -25,9 +27,11 @@ A simple web app for sharing audio files and transcribing them with OpenAI Whisp
    ```
 
 Alternatively, you can still serve the files without bundling using:
+
 ```bash
 npm start
 ```
+
 which serves the site at <http://localhost:8080>.
 
 Open your browser to the URL above to interact with the app.
