@@ -92,10 +92,8 @@ self.addEventListener("fetch", (event) => {
 
   if (
     event.request.method !== "GET" ||
-    requestUrl.hostname === "api.openai.com" ||
-    requestUrl.hostname === "unpkg.com"
+    requestUrl.hostname === "api.openai.com"
   ) {
-    // Also bypass unpkg.com for ffmpeg core files
     event.respondWith(fetch(event.request));
     return;
   }
