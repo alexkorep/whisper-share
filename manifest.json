@@ -2,7 +2,7 @@
   "name": "Audio Transcriber PWA",
   "short_name": "Transcriber",
   "description": "Transcribe M4A audio files to text using OpenAI. Can also receive shared M4A files.",
-  "start_url": "./index.html",
+  "start_url": "/whisper-share/",
   "scope": "/whisper-share/",
   "display": "standalone",
   "background_color": "#f4f4f4",
