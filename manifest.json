@@ -20,7 +20,7 @@
     }
   ],
   "share_target": {
-    "action": "receive-audio/",
+    "action": "index.html?receive-audio=true",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {

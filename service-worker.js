@@ -12,7 +12,7 @@ const urlsToCacheForAppShell = [
   // "./icon-512x512.png",
 ];
 
-const SHARE_TARGET_ACTION_PATH = `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/receive-audio/`;
+const SHARE_TARGET_ACTION_PATH = `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/index.html?receive-audio=true`;
 const REDIRECT_URL_AFTER_SHARE = `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/index.html?shared=true`;
 
 self.addEventListener("install", (event) => {
