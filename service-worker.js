@@ -1,19 +1,18 @@
-const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
 const APP_SHELL_CACHE_NAME = "audio-transcriber-pwa-app-shell-v1"; // Updated versioning if needed
 const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
 
 const urlsToCacheForAppShell = [
-  // "./",
-  // "./index.html",
-  // "./style.css",
-  // "./app.js",
-  // "./manifest.json",
-  // "./icon-192x192.png",
-  // "./icon-512x512.png",
+  "./",
+  "./index.html",
+  "./style.css",
+  "./app.js",
+  "./manifest.json",
+  "./icon-192x192.png",
+  "./icon-512x512.png",
 ];
 
-const SHARE_TARGET_ACTION_PATH = `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/index.html?receive-audio=true`;
-const REDIRECT_URL_AFTER_SHARE = `/${GH_PAGES_SUBDIRECTORY_NO_SLASH}/index.html?shared=true`;
+const SHARE_TARGET_ACTION_PATH = `/whisper-share/receive-audio`;
+const REDIRECT_URL_AFTER_SHARE = `/whisper-share/index.html?shared=true`;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
