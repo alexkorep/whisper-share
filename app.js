@@ -47,11 +47,11 @@ async function initializeApp() {
     });
 
     try {
+      // Use URLs that work with Vite's dev server
+      const baseURL = import.meta.env.BASE_URL || '/';
       await ffmpeg.load({
-        coreURL: new URL(
-          "./node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js",
-          import.meta.url
-        ).href,
+        coreURL: `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js`,
+        wasmURL: `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm`,
       });
       ffmpegLoaded = true;
       setStatus("FFmpeg engine ready.", "success");
@@ -153,7 +153,6 @@ async function initializeApp() {
     // Convert if necessary
     let mp3File = file;
     if (
-      !file.type === "audio/mpeg" &&
       !file.name.toLowerCase().endsWith(".mp3")
     ) {
       try {
@@ -328,11 +327,16 @@ async function initializeApp() {
   /*** ---------- SERVICE WORKER ---------- ***/
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      const scopePath = "/whisper-share/"; // adjust if you change repo subdir
+      const viteBase = import.meta.env.BASE_URL || '/'; // Get base from Vite
+      const workerUrl = new URL('service-worker.js', new URL(viteBase, window.location.origin)).href;
       navigator.serviceWorker
-        .register("./service-worker.js", { scope: scopePath })
-        .then((r) => console.log("SW registered with scope:", r.scope))
-        .catch((e) => console.log("SW registration failed:", e));
+        .register(workerUrl, { scope: viteBase }) // Use viteBase for scope
+        .then((registration) => {
+          console.log("ServiceWorker registration successful with scope: ", registration.scope);
+        })
+        .catch((error) => {
+          console.log("ServiceWorker registration failed: ", error);
+        });
     });
   }
 }
