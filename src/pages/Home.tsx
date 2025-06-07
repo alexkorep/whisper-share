@@ -92,7 +92,7 @@ const Home: React.FC<HomeProps> = ({
                     component="label"
                   >
                     {file
-                      ? `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+                      ? `Selected: ${file.name} (${file.size >= 1024 * 1024 ? (file.size / (1024 * 1024)).toFixed(2) + ' MB' : (file.size / 1024).toFixed(1) + ' KB'})`
                       : 'Select Audio File'}
                     <input
                       type="file"
@@ -106,7 +106,7 @@ const Home: React.FC<HomeProps> = ({
               ) : (
                 <Box sx={{ mt: 1, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
                   <Typography>
-                    <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
+                    <strong>Shared file:</strong> {sharedFile.name} ({sharedFile.size >= 1024 * 1024 ? (sharedFile.size / (1024 * 1024)).toFixed(2) + ' MB' : (sharedFile.size / 1024).toFixed(1) + ' KB'})
                   </Typography>
                   <Button onClick={() => setSharedFile(null)}>Change</Button>
                 </Box>

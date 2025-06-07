@@ -306,7 +306,11 @@ export default function App() {
     setTranscribing(true);
     setTranscription("");
     updateStatus(
-      `Preparing audio file… File size: ${(inputFile.size / 1024).toFixed(1)} KB`,
+      `Preparing audio file… File size: ${
+        inputFile.size >= 1024 * 1024
+          ? (inputFile.size / (1024 * 1024)).toFixed(2) + " MB"
+          : (inputFile.size / 1024).toFixed(1) + " KB"
+      }`,
       "loading"
     );
     let mp3File = inputFile;
@@ -319,7 +323,11 @@ export default function App() {
       }
     } else {
       updateStatus(
-        `MP3 detected – no conversion needed. File size: ${(inputFile.size / 1024).toFixed(1)} KB`,
+        `MP3 detected – no conversion needed. File size: ${
+          inputFile.size >= 1024 * 1024
+            ? (inputFile.size / (1024 * 1024)).toFixed(2) + " MB"
+            : (inputFile.size / 1024).toFixed(1) + " KB"
+        }`,
         "info"
       );
     }
@@ -347,9 +355,20 @@ export default function App() {
       }
       const data = await res.json();
       const text = data?.choices?.[0]?.message?.content;
+      // Calculate price if usage info is present
+      let priceMsg = "";
+      if (data?.usage) {
+        const inputTokens = data.usage.prompt_tokens || 0;
+        const outputTokens = data.usage.completion_tokens || 0;
+        // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
+        const inputCost = (inputTokens * 0.15) / 1_000_000;
+        const outputCost = (outputTokens * 0.6) / 1_000_000;
+        const totalCost = inputCost + outputCost;
+        priceMsg = ` (OpenAI API cost: $${totalCost.toFixed(5)})`;
+      }
       if (text) {
         setTranscription(text);
-        updateStatus("Transcription complete!", "success");
+        updateStatus(`Transcription complete!${priceMsg}`, "success");
         saveTranscription({ filename: inputFile.name, text });
       } else {
         throw new Error("Unexpected response structure.");
