@@ -368,6 +368,7 @@ export default function App() {
   return (
     <Container
       maxWidth="sm"
+      disableGutters
       sx={{
         p: 0,
         minHeight: "100vh",
