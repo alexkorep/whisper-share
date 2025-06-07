@@ -1,4 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  NavLink,
+} from 'react-router-dom';
+import Onboarding from './pages/Onboarding';
+import Home from './pages/Home';
+import History from './pages/History';
+import SettingsPage from './pages/Settings';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -144,7 +155,7 @@ export default function App() {
         updateStatus(`Error retrieving shared file: ${err.message}`, 'error');
       }
     }
-    history.replaceState(null, '', window.location.pathname + window.location.hash);
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
   }
 
   async function ensureFFmpegLoaded() {
@@ -188,11 +199,11 @@ export default function App() {
     try {
       await ffmpeg.writeFile(inputName, await fetchFile(inputFile));
       await ffmpeg.exec(['-i', inputName, outputName]);
-      const data = await ffmpeg.readFile(outputName);
+      const data = (await ffmpeg.readFile(outputName)) as Uint8Array;
       await ffmpeg.deleteFile(inputName);
       await ffmpeg.deleteFile(outputName);
       updateStatus(`Conversion of "${inputName}" complete.`, 'success');
-      return new File([data.buffer], 'converted.mp3', { type: 'audio/mpeg' });
+      return new File([data], 'converted.mp3', { type: 'audio/mpeg' });
     } catch (err: any) {
       console.error('FFmpeg conversion error:', err);
       updateStatus(`Error converting "${inputName}": ${err.message}`, 'error');
@@ -311,73 +322,49 @@ export default function App() {
   }
 
   return (
-    <div className="container">
-      <h1>Audio File Transcriber v.0.0.5</h1>
-      <div className="settings">
-        <label htmlFor="apiKey">OpenAI API Key:</label>
-        <input
-          type="password"
-          id="apiKey"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Enter your OpenAI API Key"
-        />
-        <button onClick={saveKey}>Save Key</button>
-        <p className="status-message">{apiKeyStatus}</p>
-      </div>
-
-      <div className="transcription-section">
-        {!sharedFile && (
-          <>
-            <label htmlFor="audioFile">Select Audio File (M4A, MP3, WAV, etc.):</label>
-            <input
-              type="file"
-              id="audioFile"
-              accept="audio/*,.m4a"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-            />
-          </>
-        )}
-        {sharedFile && (
-          <div id="sharedFileInfo">
-            <p>
-              <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
-            </p>
-            <button onClick={() => setSharedFile(null)}>Choose a different file</button>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      {apiKey ? (
+        <>
+          <div className="container">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <Home
+                    sharedFile={sharedFile}
+                    setSharedFile={setSharedFile}
+                    file={file}
+                    setFile={setFile}
+                    transcribe={transcribe}
+                    transcribing={transcribing}
+                    status={status}
+                    statusType={statusType}
+                    transcription={transcription}
+                  />
+                }
+              />
+              <Route
+                path="/history"
+                element={<History history={history} deleteHistory={deleteHistory} />}
+              />
+              <Route
+                path="/settings"
+                element={<SettingsPage apiKey={apiKey} setApiKey={setApiKey} saveKey={saveKey} />}
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </div>
-        )}
-        <button onClick={transcribe} disabled={transcribing}>Transcribe Audio</button>
-      </div>
-
-      <div className="output-section">
-        <h2>Transcription:</h2>
-        <div id="status" className={statusType}>{status}</div>
-        <textarea
-          id="transcriptionOutput"
-          rows={15}
-          readOnly
-          value={transcription}
-          placeholder="Transcription will appear here..."
-        />
-      </div>
-
-      <div className="history-section">
-        <h2>Transcription History</h2>
-        <div id="transcriptionHistory">
-          {history.length === 0 && <p>No transcriptions saved yet.</p>}
-          {history.map((entry) => (
-            <div className="history-entry" key={entry.id} data-id={entry.id}>
-              <div className="history-meta">
-                <strong>{entry.filename || 'Untitled'}</strong>
-                <span className="history-date">{new Date(entry.date).toLocaleString()}</span>
-              </div>
-              <textarea readOnly rows={4} value={entry.text}></textarea>
-              <button onClick={() => navigator.clipboard.writeText(entry.text)}>Copy</button>
-              <button onClick={() => deleteHistory(entry.id)}>Delete</button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+          <nav className="tabbar">
+            <NavLink to="/" end>
+              Home
+            </NavLink>
+            <NavLink to="/history">History</NavLink>
+            <NavLink to="/settings">Settings</NavLink>
+          </nav>
+        </>
+      ) : (
+        <Onboarding apiKey={apiKey} setApiKey={setApiKey} saveKey={saveKey} apiKeyStatus={apiKeyStatus} />
+      )}
+    </BrowserRouter>
   );
 }
