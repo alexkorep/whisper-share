@@ -4,6 +4,7 @@ interface HomeProps {
   apiKey: string;
   setApiKey: (k: string) => void;
   apiKeyStatus: string;
+  apiKeySaved: boolean;
   saveKey: () => void;
   file: File | null;
   setFile: (f: File | null) => void;
@@ -20,6 +21,7 @@ const Home: React.FC<HomeProps> = ({
   apiKey,
   setApiKey,
   apiKeyStatus,
+  apiKeySaved,
   saveKey,
   file,
   setFile,
@@ -35,7 +37,7 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <div className="home-page">
-      {!apiKey && (
+      {!apiKeySaved && (
         <div className="onboarding-card">
           <h2>Welcome to Whisper Share</h2>
           <p>Enter your OpenAI API Key to get started.</p>
@@ -50,7 +52,7 @@ const Home: React.FC<HomeProps> = ({
           <div className="status-message">{apiKeyStatus}</div>
         </div>
       )}
-      {apiKey && (
+      {apiKeySaved && (
         <>
           <div className="file-card">
             {!sharedFile ? (

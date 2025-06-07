@@ -30,6 +30,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [apiKey, setApiKey] = useState('');
   const [apiKeyStatus, setApiKeyStatus] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState<'info' | 'loading' | 'success' | 'error'>('info');
   const [transcription, setTranscription] = useState('');
@@ -44,8 +45,10 @@ export default function App() {
     const key = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || '';
     setApiKey(key);
     if (key) {
+      setApiKeySaved(true);
       setApiKeyStatus('API Key loaded from storage.');
     } else {
+      setApiKeySaved(false);
       setApiKeyStatus('API Key not set. Please enter and save.');
     }
 
@@ -315,9 +318,11 @@ export default function App() {
     if (apiKey.trim()) {
       localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, apiKey.trim());
       setApiKeyStatus('API Key saved successfully!');
+      setApiKeySaved(true);
     } else {
       setApiKeyStatus('Please enter an API Key.');
       localStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+      setApiKeySaved(false);
     }
   }
 
@@ -333,6 +338,7 @@ export default function App() {
             apiKey={apiKey}
             setApiKey={setApiKey}
             apiKeyStatus={apiKeyStatus}
+            apiKeySaved={apiKeySaved}
             saveKey={saveKey}
             file={file}
             setFile={setFile}
