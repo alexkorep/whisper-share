@@ -13,6 +13,7 @@ import {
 interface HomeProps {
   apiKey: string;
   setApiKey: (k: string) => void;
+  apiKeySaved: boolean;
   apiKeyStatus: string;
   saveKey: () => void;
   file: File | null;
@@ -29,6 +30,7 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({
   apiKey,
   setApiKey,
+  apiKeySaved,
   apiKeyStatus,
   saveKey,
   file,
@@ -52,7 +54,7 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <Box className="home-page">
-      {!apiKey && (
+      {!apiKeySaved && (
         <Card className="onboarding-card">
           <CardContent>
             <Typography variant="h5" gutterBottom>
@@ -79,7 +81,7 @@ const Home: React.FC<HomeProps> = ({
           </CardContent>
         </Card>
       )}
-      {apiKey && (
+      {apiKeySaved && (
         <>
           <Card className="file-card" sx={{ mb: 2 }}>
             <CardContent>
