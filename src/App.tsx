@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
+import ApiKeyPage from './components/ApiKeyPage';
+import HomePage from './components/HomePage';
+import HistoryPage from './components/HistoryPage';
+import SettingsPage from './components/SettingsPage';
+import TabBar from './components/TabBar';
+import './App.css'; // Assuming you will create this for global styles
 
 const OPENAI_API_KEY_STORAGE_KEY = 'openai_api_key_transcriber';
 const SHARED_FILES_CACHE_NAME = 'audio-transcriber-pwa-shared-files-v1';
@@ -21,7 +27,9 @@ const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian 
 • For unclear segments mark [unintelligible] plus timestamp.`;
 
 export default function App() {
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState<string | null>(localStorage.getItem('apiKey'));
+  const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>('home');
   const [apiKeyStatus, setApiKeyStatus] = useState('');
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState<'info' | 'loading' | 'success' | 'error'>('info');
@@ -34,12 +42,9 @@ export default function App() {
   const ffmpegLoadedRef = useRef(false);
 
   useEffect(() => {
-    const key = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || '';
-    setApiKey(key);
-    if (key) {
-      setApiKeyStatus('API Key loaded from storage.');
-    } else {
-      setApiKeyStatus('API Key not set. Please enter and save.');
+    const storedApiKey = localStorage.getItem('apiKey');
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
     }
 
     try {
@@ -50,6 +55,7 @@ export default function App() {
     }
 
     handleSharedFile();
+    setIsLoadingApiKey(false);
   }, []);
 
   // service worker registration
@@ -301,7 +307,7 @@ export default function App() {
   }
 
   function saveKey() {
-    if (apiKey.trim()) {
+    if (apiKey && apiKey.trim()) {
       localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, apiKey.trim());
       setApiKeyStatus('API Key saved successfully!');
     } else {
@@ -310,74 +316,44 @@ export default function App() {
     }
   }
 
+  const handleApiKeySave = (newApiKey: string) => {
+    localStorage.setItem('apiKey', newApiKey);
+    setApiKey(newApiKey);
+    setActiveTab('home'); // Navigate to home after saving API key
+  };
+
+  const handleApiKeyRemove = () => {
+    localStorage.removeItem('apiKey');
+    setApiKey(null);
+    setActiveTab('home'); // Or perhaps to a dedicated "logged out" page or back to ApiKeyPage implicitly
+  }
+
+  if (isLoadingApiKey) {
+    return <div>Loading...</div>; // Or a proper loading spinner
+  }
+
+  const renderPage = () => {
+    if (!apiKey) {
+      return <ApiKeyPage onApiKeySave={handleApiKeySave} />;
+    }
+
+    switch (activeTab) {
+      case 'home':
+        return <HomePage />;
+      case 'history':
+        return <HistoryPage />;
+      case 'settings':
+        // Settings page will need access to apiKey and remove/update functions
+        return <SettingsPage currentApiKey={apiKey} onApiKeyUpdate={handleApiKeySave} onApiKeyRemove={handleApiKeyRemove} />;
+      default:
+        return <HomePage />;
+    }
+  };
+
   return (
-    <div className="container">
-      <h1>Audio File Transcriber v.0.0.5</h1>
-      <div className="settings">
-        <label htmlFor="apiKey">OpenAI API Key:</label>
-        <input
-          type="password"
-          id="apiKey"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Enter your OpenAI API Key"
-        />
-        <button onClick={saveKey}>Save Key</button>
-        <p className="status-message">{apiKeyStatus}</p>
-      </div>
-
-      <div className="transcription-section">
-        {!sharedFile && (
-          <>
-            <label htmlFor="audioFile">Select Audio File (M4A, MP3, WAV, etc.):</label>
-            <input
-              type="file"
-              id="audioFile"
-              accept="audio/*,.m4a"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-            />
-          </>
-        )}
-        {sharedFile && (
-          <div id="sharedFileInfo">
-            <p>
-              <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
-            </p>
-            <button onClick={() => setSharedFile(null)}>Choose a different file</button>
-          </div>
-        )}
-        <button onClick={transcribe} disabled={transcribing}>Transcribe Audio</button>
-      </div>
-
-      <div className="output-section">
-        <h2>Transcription:</h2>
-        <div id="status" className={statusType}>{status}</div>
-        <textarea
-          id="transcriptionOutput"
-          rows={15}
-          readOnly
-          value={transcription}
-          placeholder="Transcription will appear here..."
-        />
-      </div>
-
-      <div className="history-section">
-        <h2>Transcription History</h2>
-        <div id="transcriptionHistory">
-          {history.length === 0 && <p>No transcriptions saved yet.</p>}
-          {history.map((entry) => (
-            <div className="history-entry" key={entry.id} data-id={entry.id}>
-              <div className="history-meta">
-                <strong>{entry.filename || 'Untitled'}</strong>
-                <span className="history-date">{new Date(entry.date).toLocaleString()}</span>
-              </div>
-              <textarea readOnly rows={4} value={entry.text}></textarea>
-              <button onClick={() => navigator.clipboard.writeText(entry.text)}>Copy</button>
-              <button onClick={() => deleteHistory(entry.id)}>Delete</button>
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className="App">
+      {renderPage()}
+      {apiKey && <TabBar activeTab={activeTab} onTabChange={setActiveTab} />}
     </div>
   );
 }
