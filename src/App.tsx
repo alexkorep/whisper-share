@@ -334,7 +334,7 @@ export default function App() {
 
   // Tab navigation and page rendering
   return (
-    <Container maxWidth="sm" className="app-mobile-container">
+    <Container maxWidth="sm" sx={{ py: 2 }}>
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -342,7 +342,7 @@ export default function App() {
           </Typography>
         </Toolbar>
       </AppBar>
-      <main className="mobile-main">
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {tab === 'home' && (
           <Home
             apiKey={apiKey}

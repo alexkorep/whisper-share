@@ -19,11 +19,11 @@ const Settings: React.FC<SettingsProps> = ({ apiKey, setApiKey, apiKeyStatus, sa
   const [showKey, setShowKey] = useState(false);
 
   return (
-    <Box className="settings-page">
+    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h5" gutterBottom>
         Settings
       </Typography>
-      <Card className="api-key-section">
+      <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography gutterBottom>OpenAI API Key</Typography>
           <TextField
@@ -40,12 +40,12 @@ const Settings: React.FC<SettingsProps> = ({ apiKey, setApiKey, apiKeyStatus, sa
           <Button fullWidth variant="contained" sx={{ mt: 1 }} onClick={saveKey}>
             Save
           </Button>
-          <Typography variant="body2" className="status-message" sx={{ mt: 1 }}>
+          <Typography variant="body2" sx={{ mt: 1 }}>
             {apiKeyStatus}
           </Typography>
         </CardContent>
       </Card>
-      <Card className="about-section">
+      <Card sx={{ mt: 2 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>About</Typography>
           <Typography>Whisper Share v1.0</Typography>

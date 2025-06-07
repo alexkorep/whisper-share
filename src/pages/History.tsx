@@ -24,22 +24,21 @@ interface HistoryProps {
 
 const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
   return (
-    <Box className="history-page">
+    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h5" gutterBottom>
         History
       </Typography>
       {history.length === 0 && (
-        <Typography className="empty-history">No transcriptions yet.</Typography>
+        <Typography>No transcriptions yet.</Typography>
       )}
       {history.map(entry => (
-        <Card className="history-entry-card" key={entry.id}
-          sx={{ mb: 2 }}>
+        <Card key={entry.id} sx={{ mb: 2 }}>
           <CardContent>
-            <Box className="history-meta">
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1 }}>
               <Typography component="span" fontWeight="bold">
                 {entry.filename || 'Untitled'}
               </Typography>
-              <Typography component="span" className="history-date">
+              <Typography component="span" sx={{ color: 'text.secondary', fontSize: 12 }}>
                 {new Date(entry.date).toLocaleString()}
               </Typography>
             </Box>
@@ -51,7 +50,7 @@ const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
               InputProps={{ readOnly: true }}
               sx={{ mt: 1 }}
             />
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }} className="history-actions">
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button variant="outlined" onClick={() => onCopy(entry.text)}>
                 Copy
               </Button>

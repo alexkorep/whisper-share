@@ -51,9 +51,9 @@ const Home: React.FC<HomeProps> = ({
       : 'info';
 
   return (
-    <Box className="home-page">
+    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
       {!apiKey && (
-        <Card className="onboarding-card">
+        <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="h5" gutterBottom>
               Welcome to Whisper Share
@@ -73,7 +73,7 @@ const Home: React.FC<HomeProps> = ({
             <Button variant="contained" fullWidth sx={{ mt: 1 }} onClick={saveKey}>
               Save & Continue
             </Button>
-            <Typography variant="body2" className="status-message" sx={{ mt: 1 }}>
+            <Typography variant="body2" sx={{ mt: 1 }}>
               {apiKeyStatus}
             </Typography>
           </CardContent>
@@ -81,14 +81,14 @@ const Home: React.FC<HomeProps> = ({
       )}
       {apiKey && (
         <>
-          <Card className="file-card" sx={{ mb: 2 }}>
+          <Card sx={{ mb: 2 }}>
             <CardContent>
               {!sharedFile ? (
                 <>
                   <Button
                     variant="contained"
                     component="label"
-                    className="file-select-btn"
+
                   >
                     {file ? `Selected: ${file.name}` : 'Select Audio File'}
                     <input
@@ -101,7 +101,7 @@ const Home: React.FC<HomeProps> = ({
                   </Button>
                 </>
               ) : (
-                <Box className="shared-file-info">
+                <Box sx={{ mt: 1, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
                   <Typography>
                     <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
                   </Typography>
@@ -121,7 +121,7 @@ const Home: React.FC<HomeProps> = ({
             <Alert severity={alertSeverity}>{status}</Alert>
           </Stack>
           {transcription && (
-            <Card className="transcription-output-card" sx={{ mt: 2 }}>
+            <Card sx={{ mt: 2 }}>
               <CardContent>
                 <TextField
                   multiline
@@ -130,7 +130,7 @@ const Home: React.FC<HomeProps> = ({
                   value={transcription}
                   InputProps={{ readOnly: true }}
                 />
-                <Stack direction="row" spacing={2} sx={{ mt: 1 }} className="output-actions">
+                <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
                   <Button
                     variant="outlined"
                     onClick={() => navigator.clipboard.writeText(transcription)}
