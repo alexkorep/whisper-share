@@ -15,6 +15,7 @@ interface HomeProps {
   setApiKey: (k: string) => void;
   apiKeyStatus: string;
   saveKey: () => void;
+  apiKeySaved: boolean;
   file: File | null;
   setFile: (f: File | null) => void;
   sharedFile: File | null;
@@ -31,6 +32,7 @@ const Home: React.FC<HomeProps> = ({
   setApiKey,
   apiKeyStatus,
   saveKey,
+  apiKeySaved,
   file,
   setFile,
   sharedFile,
@@ -52,7 +54,7 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {!apiKey && (
+      {!apiKeySaved && (
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="h5" gutterBottom>
