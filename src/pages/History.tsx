@@ -16,13 +16,27 @@ interface HistoryEntry {
   date: string;
 }
 
+
 interface HistoryProps {
   history: HistoryEntry[];
   onCopy: (text: string) => void;
   onDelete: (id: string) => void;
 }
 
+
 const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
+  // Share handler for Web Share API
+  const handleShare = (entry: HistoryEntry) => {
+    if (navigator.share) {
+      navigator.share({
+        title: entry.filename || 'Transcription',
+        text: entry.text,
+      });
+    } else {
+      alert('Web Share API is not supported in this browser.');
+    }
+  };
+
   return (
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h5" gutterBottom>
@@ -57,6 +71,11 @@ const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
               <Button variant="outlined" onClick={() => onDelete(entry.id)}>
                 Delete
               </Button>
+              {'share' in navigator && typeof navigator.share === 'function' && (
+                <Button variant="outlined" onClick={() => handleShare(entry)}>
+                  Share
+                </Button>
+              )}
             </Stack>
           </CardContent>
         </Card>
