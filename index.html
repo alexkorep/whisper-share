@@ -10,44 +10,7 @@
     <link rel="apple-touch-icon" href="icon-192x192.png" />
   </head>
   <body>
-    <div class="container">
-      <h1>Audio File Transcriber v.0.0.5</h1>
-
-      <div class="settings">
-        <label for="apiKey">OpenAI API Key:</label>
-        <input
-          type="password"
-          id="apiKey"
-          placeholder="Enter your OpenAI API Key"
-        />
-        <button id="saveApiKey">Save Key</button>
-        <p id="apiKeyStatus" class="status-message"></p>
-      </div>
-
-      <div class="transcription-section">
-        <label for="audioFile">Select Audio File (M4A, MP3, WAV, etc.):</label>
-        <input type="file" id="audioFile" accept="audio/*,.m4a" />
-
-        <button id="transcribeButton">Transcribe Audio</button>
-      </div>
-
-      <div class="output-section">
-        <h2>Transcription:</h2>
-        <div id="status"></div>
-        <textarea
-          id="transcriptionOutput"
-          rows="15"
-          readonly
-          placeholder="Transcription will appear here..."
-        ></textarea>
-      </div>
-
-      <div class="history-section">
-        <h2>Transcription History</h2>
-        <div id="transcriptionHistory"></div>
-      </div>
-    </div>
-
-    <script type="module" src="app.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
