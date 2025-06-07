@@ -151,3 +151,232 @@ button:disabled {
 #sharedFileInfo button:hover {
   background-color: #5a6268;
 }
+
+/* Mobile app container and header */
+.app-mobile-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f9fa;
+}
+.mobile-header {
+  background: #222e3a;
+  color: #fff;
+  padding: 16px 0 8px 0;
+  text-align: center;
+  font-size: 1.3em;
+  font-weight: 600;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.app-title {
+  font-family: inherit;
+}
+.mobile-main {
+  flex: 1 1 auto;
+  padding: 16px 8px 64px 8px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Tab bar */
+.mobile-tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.03);
+  z-index: 100;
+  height: 56px;
+}
+.mobile-tabbar button {
+  flex: 1 1 0;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: #888;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  padding: 0;
+  transition: color 0.2s;
+}
+.mobile-tabbar button.active {
+  color: #007bff;
+  font-weight: 600;
+}
+.tab-label {
+  font-size: 0.8em;
+  margin-top: 2px;
+}
+
+/* Home page */
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.onboarding-card, .file-card, .transcription-output-card, .history-entry-card, .settings-page, .api-key-section, .about-section {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  padding: 18px 14px;
+  margin-bottom: 8px;
+}
+.onboarding-card h2 {
+  margin-top: 0;
+}
+.onboarding-card input {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.onboarding-card button {
+  width: 100%;
+}
+.status-message {
+  margin-top: 6px;
+  font-size: 0.95em;
+}
+.file-select-btn, .transcribe-btn {
+  width: 100%;
+  padding: 14px 0;
+  font-size: 1.1em;
+  border-radius: 8px;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.file-select-btn {
+  background: #e7f3ff;
+  color: #007bff;
+  border: 1px solid #b6d6ff;
+}
+.file-select-btn:active, .file-select-btn:focus {
+  background: #d0e7ff;
+}
+.transcribe-btn:disabled {
+  background: #b6d6ff;
+  color: #fff;
+}
+.status-bar {
+  margin: 8px 0 0 0;
+  font-size: 1em;
+  min-height: 1.2em;
+}
+.status-bar.info { color: #333; }
+.status-bar.success { color: #1cae81; }
+.status-bar.error { color: #e74c3c; }
+.status-bar.loading { color: #007bff; }
+.transcription-output-card textarea {
+  width: 100%;
+  min-height: 120px;
+  font-size: 1.05em;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  background: #f9f9f9;
+  padding: 10px;
+  resize: vertical;
+}
+.output-actions {
+  display: flex;
+  gap: 10px;
+}
+.output-actions button {
+  flex: 1 1 0;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 0;
+  font-size: 1em;
+}
+.output-actions button:active {
+  background: #0056b3;
+}
+
+/* History page */
+.history-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-entry-card {
+  margin-bottom: 0;
+}
+.history-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.98em;
+  margin-bottom: 4px;
+}
+.history-entry-card textarea {
+  width: 100%;
+  min-height: 60px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  background: #f9f9f9;
+  padding: 8px;
+  font-size: 1em;
+}
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+.history-actions button {
+  flex: 1 1 0;
+  background: #e7f3ff;
+  color: #007bff;
+  border: 1px solid #b6d6ff;
+  border-radius: 6px;
+  padding: 8px 0;
+  font-size: 1em;
+}
+.history-actions button:active {
+  background: #d0e7ff;
+}
+.empty-history {
+  text-align: center;
+  color: #aaa;
+  margin-top: 24px;
+}
+
+/* Settings page */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.api-key-section input {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.api-key-section button {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.about-section {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  color: #555;
+  font-size: 0.98em;
+}
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+  .mobile-main {
+    padding: 10px 2px 64px 2px;
+  }
+  .app-mobile-container {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
