@@ -3,7 +3,6 @@ const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
 
 console.log("SW: Service worker script loaded, version v3");
 
-const GH_PAGES_SUBDIRECTORY_NO_SLASH = "whisper-share";
 
 const urlsToCacheForAppShell = [
   "./",
@@ -19,7 +18,7 @@ const SHARE_TARGET_ACTION_PATH = `/whisper-share/receive-audio`;
 const REDIRECT_URL_AFTER_SHARE = `/whisper-share/index.html?shared=true`;
 
 self.addEventListener("install", (event) => {
-  console.log("SW: Installing service worker v2");
+  console.log("SW: Installing service worker v3");
   event.waitUntil(
     caches
       .open(APP_SHELL_CACHE_NAME)
@@ -71,12 +70,6 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
-  
-  // Debug logging for ALL requests
-  console.log("SW: Fetch event for:", requestUrl.href);
-  console.log("SW: Pathname:", requestUrl.pathname);
-  console.log("SW: Method:", event.request.method);
-  console.log("SW: Looking for:", SHARE_TARGET_ACTION_PATH);
   
   // Check if this is our share target request
   const isShareTarget = (
