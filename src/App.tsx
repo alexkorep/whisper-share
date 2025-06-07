@@ -5,6 +5,17 @@ import { fetchFile } from '@ffmpeg/util';
 import Home from './pages/Home';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  BottomNavigation,
+  BottomNavigationAction,
+  Container,
+} from '@mui/material';
+import MicIcon from '@mui/icons-material/Mic';
+import HistoryIcon from '@mui/icons-material/History';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 const OPENAI_API_KEY_STORAGE_KEY = 'openai_api_key_transcriber';
 const SHARED_FILES_CACHE_NAME = 'audio-transcriber-pwa-shared-files-v1';
@@ -323,10 +334,14 @@ export default function App() {
 
   // Tab navigation and page rendering
   return (
-    <div className="app-mobile-container">
-      <header className="mobile-header">
-        <span className="app-title">Whisper Share</span>
-      </header>
+    <Container maxWidth="sm" className="app-mobile-container">
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Whisper Share
+          </Typography>
+        </Toolbar>
+      </AppBar>
       <main className="mobile-main">
         {tab === 'home' && (
           <Home
@@ -361,20 +376,27 @@ export default function App() {
           />
         )}
       </main>
-      <nav className="mobile-tabbar">
-        <button className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}>
-          <span role="img" aria-label="Home">🎤</span>
-          <span className="tab-label">Transcribe</span>
-        </button>
-        <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
-          <span role="img" aria-label="History">🕑</span>
-          <span className="tab-label">History</span>
-        </button>
-        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
-          <span role="img" aria-label="Settings">⚙️</span>
-          <span className="tab-label">Settings</span>
-        </button>
-      </nav>
-    </div>
+      <BottomNavigation
+        showLabels
+        value={tab}
+        onChange={(_, value) => setTab(value)}
+      >
+        <BottomNavigationAction
+          label="Transcribe"
+          value="home"
+          icon={<MicIcon />}
+        />
+        <BottomNavigationAction
+          label="History"
+          value="history"
+          icon={<HistoryIcon />}
+        />
+        <BottomNavigationAction
+          label="Settings"
+          value="settings"
+          icon={<SettingsIcon />}
+        />
+      </BottomNavigation>
+    </Container>
   );
 }

@@ -1,4 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  TextField,
+  Typography,
+  Alert,
+  Stack,
+} from '@mui/material';
 
 interface HomeProps {
   apiKey: string;
@@ -33,77 +43,112 @@ const Home: React.FC<HomeProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const alertSeverity =
+    statusType === 'error'
+      ? 'error'
+      : statusType === 'success'
+      ? 'success'
+      : 'info';
+
   return (
-    <div className="home-page">
+    <Box className="home-page">
       {!apiKey && (
-        <div className="onboarding-card">
-          <h2>Welcome to Whisper Share</h2>
-          <p>Enter your OpenAI API Key to get started.</p>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            placeholder="OpenAI API Key"
-            autoFocus
-          />
-          <button onClick={saveKey}>Save & Continue</button>
-          <div className="status-message">{apiKeyStatus}</div>
-        </div>
+        <Card className="onboarding-card">
+          <CardContent>
+            <Typography variant="h5" gutterBottom>
+              Welcome to Whisper Share
+            </Typography>
+            <Typography sx={{ mb: 2 }}>
+              Enter your OpenAI API Key to get started.
+            </Typography>
+            <TextField
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              label="OpenAI API Key"
+              fullWidth
+              autoFocus
+              margin="dense"
+            />
+            <Button variant="contained" fullWidth sx={{ mt: 1 }} onClick={saveKey}>
+              Save & Continue
+            </Button>
+            <Typography variant="body2" className="status-message" sx={{ mt: 1 }}>
+              {apiKeyStatus}
+            </Typography>
+          </CardContent>
+        </Card>
       )}
       {apiKey && (
         <>
-          <div className="file-card">
-            {!sharedFile ? (
-              <>
-                <button
-                  className="file-select-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {file ? `Selected: ${file.name}` : 'Select Audio File'}
-                </button>
-                <input
-                  type="file"
-                  accept="audio/*,.m4a"
-                  style={{ display: 'none' }}
-                  ref={fileInputRef}
-                  onChange={e => setFile(e.target.files ? e.target.files[0] : null)}
-                />
-              </>
-            ) : (
-              <div className="shared-file-info">
-                <p>
-                  <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
-                </p>
-                <button onClick={() => setSharedFile(null)}>Change</button>
-              </div>
-            )}
-          </div>
-          <button
-            className="transcribe-btn"
-            onClick={transcribe}
-            disabled={transcribing || (!file && !sharedFile)}
-          >
-            {transcribing ? 'Transcribing…' : 'Transcribe'}
-          </button>
-          <div className={`status-bar ${statusType}`}>{status}</div>
-          {transcription && (
-            <div className="transcription-output-card">
-              <textarea readOnly value={transcription} rows={8} />
-              <div className="output-actions">
-                <button onClick={() => navigator.clipboard.writeText(transcription)}>Copy</button>
-                {navigator.share && (
-                  <button
-                    onClick={() => navigator.share({ text: transcription })}
+          <Card className="file-card" sx={{ mb: 2 }}>
+            <CardContent>
+              {!sharedFile ? (
+                <>
+                  <Button
+                    variant="contained"
+                    component="label"
+                    className="file-select-btn"
                   >
-                    Share
-                  </button>
-                )}
-              </div>
-            </div>
+                    {file ? `Selected: ${file.name}` : 'Select Audio File'}
+                    <input
+                      type="file"
+                      accept="audio/*,.m4a"
+                      hidden
+                      ref={fileInputRef}
+                      onChange={e => setFile(e.target.files ? e.target.files[0] : null)}
+                    />
+                  </Button>
+                </>
+              ) : (
+                <Box className="shared-file-info">
+                  <Typography>
+                    <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
+                  </Typography>
+                  <Button onClick={() => setSharedFile(null)}>Change</Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+          <Stack spacing={2}>
+            <Button
+              variant="contained"
+              onClick={transcribe}
+              disabled={transcribing || (!file && !sharedFile)}
+            >
+              {transcribing ? 'Transcribing…' : 'Transcribe'}
+            </Button>
+            <Alert severity={alertSeverity}>{status}</Alert>
+          </Stack>
+          {transcription && (
+            <Card className="transcription-output-card" sx={{ mt: 2 }}>
+              <CardContent>
+                <TextField
+                  multiline
+                  rows={8}
+                  fullWidth
+                  value={transcription}
+                  InputProps={{ readOnly: true }}
+                />
+                <Stack direction="row" spacing={2} sx={{ mt: 1 }} className="output-actions">
+                  <Button
+                    variant="outlined"
+                    onClick={() => navigator.clipboard.writeText(transcription)}
+                  >
+                    Copy
+                  </Button>
+                  {navigator.share && (
+                    <Button variant="outlined" onClick={() => navigator.share({ text: transcription })}>
+                      Share
+                    </Button>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
           )}
         </>
       )}
-    </div>
+    </Box>
   );
 };
 
