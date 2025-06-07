@@ -27,6 +27,11 @@ const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
           <textarea readOnly rows={4} value={entry.text}></textarea>
           <div className="history-actions">
             <button onClick={() => onCopy(entry.text)}>Copy</button>
+            {navigator.share && (
+              <button onClick={() => navigator.share({ text: entry.text })}>
+                Share
+              </button>
+            )}
             <button onClick={() => onDelete(entry.id)}>Delete</button>
           </div>
         </div>
