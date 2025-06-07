@@ -1,35 +1,7 @@
-const APP_SHELL_CACHE_NAME = "audio-transcriber-pwa-app-shell-v3"; // Updated version to force refresh
 const SHARED_FILES_CACHE_NAME = "audio-transcriber-pwa-shared-files-v1";
-
-console.log("SW: Service worker script loaded, version v3");
-
-
-const urlsToCacheForAppShell = [
-  // "./",
-  // "./index.html",
-  // "./style.css",
-  // "./app.js",
-  // "./manifest.json",
-  // "./icon-192x192.png",
-  // "./icon-512x512.png",
-];
 
 const SHARE_TARGET_ACTION_PATH = `/whisper-share/receive-audio`;
 const REDIRECT_URL_AFTER_SHARE = `/whisper-share/index.html?shared=true`;
-
-self.addEventListener("install", (event) => {
-  console.log("SW: Installing service worker v3");
-  event.waitUntil(
-    caches
-      .open(APP_SHELL_CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCacheForAppShell))
-      .catch((err) => console.error("App shell cache addAll failed:", err))
-      .then(() => {
-        console.log("SW: Force skipping waiting");
-        return self.skipWaiting();
-      })
-  );
-});
 
 self.addEventListener("activate", (event) => {
   console.log("SW: Activating service worker");
@@ -40,7 +12,6 @@ self.addEventListener("activate", (event) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (
-              cacheName !== APP_SHELL_CACHE_NAME &&
               cacheName !== SHARED_FILES_CACHE_NAME &&
               cacheName.startsWith("audio-transcriber-pwa-")
             ) {
@@ -56,11 +27,11 @@ self.addEventListener("activate", (event) => {
       .then(() => {
         console.log("SW: Service worker is now controlling all clients");
         // Notify all clients that service worker is ready
-        return self.clients.matchAll().then(clients => {
-          clients.forEach(client => {
+        return self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
             client.postMessage({
-              type: 'SW_READY',
-              message: 'Service worker is ready and controlling this page'
+              type: "SW_READY",
+              message: "Service worker is ready and controlling this page",
             });
           });
         });
@@ -70,13 +41,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
-  
+
   // Check if this is our share target request
-  const isShareTarget = (
-    requestUrl.pathname === SHARE_TARGET_ACTION_PATH ||
-    requestUrl.pathname === `/whisper-share/receive-audio` ||
-    requestUrl.href.includes('/whisper-share/receive-audio')
-  ) && event.request.method === "POST";
+  const isShareTarget =
+    (requestUrl.pathname === SHARE_TARGET_ACTION_PATH ||
+      requestUrl.pathname === `/whisper-share/receive-audio` ||
+      requestUrl.href.includes("/whisper-share/receive-audio")) &&
+    event.request.method === "POST";
 
   if (isShareTarget) {
     console.log("SW: ✅ Intercepting share target POST request");
@@ -118,46 +89,4 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-
-  // Log non-share requests for debugging
-  if (event.request.method === "POST") {
-    console.log("SW: ⚠️ POST request not intercepted:", requestUrl.href);
-  }
-
-  if (
-    event.request.method !== "GET" ||
-    requestUrl.hostname === "api.openai.com"
-  ) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (
-            !networkResponse ||
-            networkResponse.status !== 200 ||
-            networkResponse.type !== "basic"
-          ) {
-            return networkResponse;
-          }
-          const responseToCache = networkResponse.clone();
-          caches
-            .open(APP_SHELL_CACHE_NAME)
-            .then((cache) => cache.put(event.request, responseToCache));
-          return networkResponse;
-        })
-        .catch((error) => {
-          console.error(
-            "SW: Fetching app asset failed:",
-            event.request.url,
-            error
-          );
-          throw error;
-        });
-    })
-  );
 });
