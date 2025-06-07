@@ -1,6 +1,10 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
+import Home from './pages/Home';
+import History from './pages/History';
+import Settings from './pages/Settings';
 
 const OPENAI_API_KEY_STORAGE_KEY = 'openai_api_key_transcriber';
 const SHARED_FILES_CACHE_NAME = 'audio-transcriber-pwa-shared-files-v1';
@@ -14,13 +18,16 @@ interface HistoryEntry {
 }
 
 const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian text.
-
 # Notes
 • Preserve speaker's wording.
 • Use correct punctuation/capitalisation.
 • For unclear segments mark [unintelligible] plus timestamp.`;
 
+
+type Tab = 'home' | 'history' | 'settings';
+
 export default function App() {
+  const [tab, setTab] = useState<Tab>('home');
   const [apiKey, setApiKey] = useState('');
   const [apiKeyStatus, setApiKeyStatus] = useState('');
   const [status, setStatus] = useState('');
@@ -144,7 +151,7 @@ export default function App() {
         updateStatus(`Error retrieving shared file: ${err.message}`, 'error');
       }
     }
-    history.replaceState(null, '', window.location.pathname + window.location.hash);
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
   }
 
   async function ensureFFmpegLoaded() {
@@ -159,12 +166,14 @@ export default function App() {
     ffmpegRef.current = ffmpeg;
     try {
       let coreURL: string, wasmURL: string;
-      if (import.meta.env.DEV) {
-        const baseURL = import.meta.env.BASE_URL || '/';
+      // @ts-ignore
+      const env = (import.meta as any).env || { DEV: false, BASE_URL: '/' };
+      if (env.DEV) {
+        const baseURL = env.BASE_URL || '/';
         coreURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js`;
         wasmURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm`;
       } else {
-        const baseURL = import.meta.env.BASE_URL || '/';
+        const baseURL = env.BASE_URL || '/';
         coreURL = `${window.location.origin}${baseURL}ffmpeg-core.js`;
         wasmURL = `${window.location.origin}${baseURL}ffmpeg-core.wasm`;
       }
@@ -192,7 +201,9 @@ export default function App() {
       await ffmpeg.deleteFile(inputName);
       await ffmpeg.deleteFile(outputName);
       updateStatus(`Conversion of "${inputName}" complete.`, 'success');
-      return new File([data.buffer], 'converted.mp3', { type: 'audio/mpeg' });
+      // @ts-ignore
+      const buffer = data instanceof Uint8Array ? data : (data && data.buffer ? data.buffer : data);
+      return new File([buffer], 'converted.mp3', { type: 'audio/mpeg' });
     } catch (err: any) {
       console.error('FFmpeg conversion error:', err);
       updateStatus(`Error converting "${inputName}": ${err.message}`, 'error');
@@ -310,74 +321,60 @@ export default function App() {
     }
   }
 
+  // Tab navigation and page rendering
   return (
-    <div className="container">
-      <h1>Audio File Transcriber v.0.0.5</h1>
-      <div className="settings">
-        <label htmlFor="apiKey">OpenAI API Key:</label>
-        <input
-          type="password"
-          id="apiKey"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Enter your OpenAI API Key"
-        />
-        <button onClick={saveKey}>Save Key</button>
-        <p className="status-message">{apiKeyStatus}</p>
-      </div>
-
-      <div className="transcription-section">
-        {!sharedFile && (
-          <>
-            <label htmlFor="audioFile">Select Audio File (M4A, MP3, WAV, etc.):</label>
-            <input
-              type="file"
-              id="audioFile"
-              accept="audio/*,.m4a"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-            />
-          </>
+    <div className="app-mobile-container">
+      <header className="mobile-header">
+        <span className="app-title">Whisper Share</span>
+      </header>
+      <main className="mobile-main">
+        {tab === 'home' && (
+          <Home
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            apiKeyStatus={apiKeyStatus}
+            saveKey={saveKey}
+            file={file}
+            setFile={setFile}
+            sharedFile={sharedFile}
+            setSharedFile={setSharedFile}
+            transcribe={transcribe}
+            transcribing={transcribing}
+            status={status}
+            statusType={statusType}
+            transcription={transcription}
+          />
         )}
-        {sharedFile && (
-          <div id="sharedFileInfo">
-            <p>
-              <strong>Shared file:</strong> {sharedFile.name} ({(sharedFile.size / 1024).toFixed(1)} KB)
-            </p>
-            <button onClick={() => setSharedFile(null)}>Choose a different file</button>
-          </div>
+        {tab === 'history' && (
+          <History
+            history={history}
+            onCopy={text => navigator.clipboard.writeText(text)}
+            onDelete={deleteHistory}
+          />
         )}
-        <button onClick={transcribe} disabled={transcribing}>Transcribe Audio</button>
-      </div>
-
-      <div className="output-section">
-        <h2>Transcription:</h2>
-        <div id="status" className={statusType}>{status}</div>
-        <textarea
-          id="transcriptionOutput"
-          rows={15}
-          readOnly
-          value={transcription}
-          placeholder="Transcription will appear here..."
-        />
-      </div>
-
-      <div className="history-section">
-        <h2>Transcription History</h2>
-        <div id="transcriptionHistory">
-          {history.length === 0 && <p>No transcriptions saved yet.</p>}
-          {history.map((entry) => (
-            <div className="history-entry" key={entry.id} data-id={entry.id}>
-              <div className="history-meta">
-                <strong>{entry.filename || 'Untitled'}</strong>
-                <span className="history-date">{new Date(entry.date).toLocaleString()}</span>
-              </div>
-              <textarea readOnly rows={4} value={entry.text}></textarea>
-              <button onClick={() => navigator.clipboard.writeText(entry.text)}>Copy</button>
-              <button onClick={() => deleteHistory(entry.id)}>Delete</button>
-            </div>
-          ))}
-        </div>
-      </div>
+        {tab === 'settings' && (
+          <Settings
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            apiKeyStatus={apiKeyStatus}
+            saveKey={saveKey}
+          />
+        )}
+      </main>
+      <nav className="mobile-tabbar">
+        <button className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}>
+          <span role="img" aria-label="Home">🎤</span>
+          <span className="tab-label">Transcribe</span>
+        </button>
+        <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
+          <span role="img" aria-label="History">🕑</span>
+          <span className="tab-label">History</span>
+        </button>
+        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
+          <span role="img" aria-label="Settings">⚙️</span>
+          <span className="tab-label">Settings</span>
+        </button>
+      </nav>
     </div>
   );
 }
