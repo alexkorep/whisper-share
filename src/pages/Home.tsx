@@ -90,9 +90,10 @@ const Home: React.FC<HomeProps> = ({
                   <Button
                     variant="contained"
                     component="label"
-
                   >
-                    {file ? `Selected: ${file.name}` : 'Select Audio File'}
+                    {file
+                      ? `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+                      : 'Select Audio File'}
                     <input
                       type="file"
                       accept="audio/*,.m4a"

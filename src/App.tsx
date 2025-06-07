@@ -305,7 +305,10 @@ export default function App() {
     }
     setTranscribing(true);
     setTranscription("");
-    updateStatus("Preparing audio file…", "loading");
+    updateStatus(
+      `Preparing audio file… File size: ${(inputFile.size / 1024).toFixed(1)} KB`,
+      "loading"
+    );
     let mp3File = inputFile;
     if (!inputFile.name.toLowerCase().endsWith(".mp3")) {
       try {
@@ -315,7 +318,10 @@ export default function App() {
         return;
       }
     } else {
-      updateStatus("MP3 detected – no conversion needed.", "info");
+      updateStatus(
+        `MP3 detected – no conversion needed. File size: ${(inputFile.size / 1024).toFixed(1)} KB`,
+        "info"
+      );
     }
 
     try {
