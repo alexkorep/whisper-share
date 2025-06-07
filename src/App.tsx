@@ -12,6 +12,7 @@ import {
   BottomNavigation,
   BottomNavigationAction,
   Container,
+  Box,
 } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import HistoryIcon from '@mui/icons-material/History';
@@ -334,7 +335,7 @@ export default function App() {
 
   // Tab navigation and page rendering
   return (
-    <Container maxWidth="sm" sx={{ py: 2 }}>
+    <Container maxWidth="sm" sx={{ py: 2, minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -380,6 +381,17 @@ export default function App() {
         showLabels
         value={tab}
         onChange={(_, value) => setTab(value)}
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100vw',
+          zIndex: 1300,
+          boxShadow: 3,
+          borderTop: 1,
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
+        }}
       >
         <BottomNavigationAction
           label="Transcribe"
@@ -397,6 +409,7 @@ export default function App() {
           icon={<SettingsIcon />}
         />
       </BottomNavigation>
+      <Box sx={{ height: { xs: 56, sm: 56, md: 56 } }} />
     </Container>
   );
 }
