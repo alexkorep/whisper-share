@@ -34,6 +34,14 @@ async function initializeApp() {
   let ffmpeg = null; // FFmpeg instance (lazy-loaded)
   let ffmpegLoaded = false; // Flag so we only load once
 
+  const TRANSCRIPTION_INSTRUCTIONS =
+    `Transcribe the following audio into Russian text.
+
+# Notes
+• Preserve speaker's wording.
+• Use correct punctuation/capitalisation.
+• For unclear segments mark [unintelligible] plus timestamp.`;
+
   /*** ---------- FFmpeg HELPERS ---------- ***/
 
   async function ensureFFmpegLoaded() {
@@ -251,41 +259,7 @@ async function initializeApp() {
     setStatus("Reading file data…", "loading");
     try {
       const base64 = await readFileAsBase64(mp3File); // data: URI
-      const body = {
-        model: "gpt-4o-mini-audio-preview",
-        messages: [
-          {
-            role: "system",
-            content: [
-              {
-                type: "text",
-                text: `Transcribe the following audio into Russian text.
-
-# Notes
-• Preserve speaker's wording.
-• Use correct punctuation/capitalisation.
-• For unclear segments mark [unintelligible] plus timestamp.`,
-              },
-            ],
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "" },
-              {
-                type: "input_audio",
-                input_audio: {
-                  data: base64.split(",")[1], // strip "data:…;base64,"
-                  format: "mp3",
-                },
-              },
-            ],
-          },
-        ],
-        modalities: ["text"],
-        temperature: 1,
-        max_completion_tokens: 16384,
-      };
+      const body = buildOpenAIRequest(base64);
 
       setStatus("Sending to OpenAI…", "loading");
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -395,6 +369,34 @@ async function initializeApp() {
       r.onerror = reject;
       r.readAsDataURL(file);
     });
+  }
+
+  function buildOpenAIRequest(base64Data) {
+    return {
+      model: "gpt-4o-mini-audio-preview",
+      messages: [
+        {
+          role: "system",
+          content: [{ type: "text", text: TRANSCRIPTION_INSTRUCTIONS }],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "" },
+            {
+              type: "input_audio",
+              input_audio: {
+                data: base64Data.split(",")[1],
+                format: "mp3",
+              },
+            },
+          ],
+        },
+      ],
+      modalities: ["text"],
+      temperature: 1,
+      max_completion_tokens: 16384,
+    };
   }
 
   /*** ---------- INIT ---------- ***/
