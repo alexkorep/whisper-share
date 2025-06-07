@@ -27,7 +27,7 @@ const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian 
 • For unclear segments mark [unintelligible] plus timestamp.`;
 
 export default function App() {
-  const [apiKey, setApiKey] = useState<string | null>(localStorage.getItem('apiKey'));
+  const [apiKey, setApiKey] = useState<string | null>(null); // Initialize with null
   const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [apiKeyStatus, setApiKeyStatus] = useState('');
@@ -42,7 +42,7 @@ export default function App() {
   const ffmpegLoadedRef = useRef(false);
 
   useEffect(() => {
-    const storedApiKey = localStorage.getItem('apiKey');
+    const storedApiKey = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY); // Use constant
     if (storedApiKey) {
       setApiKey(storedApiKey);
     }
@@ -90,6 +90,29 @@ export default function App() {
       });
     }
   }, []);
+
+  // The new handleApiKeySave function
+  const handleApiKeySave = (newApiKey: string) => {
+    if (!newApiKey.trim()) {
+      // updateStatus('API Key cannot be empty.', 'error'); // Or use a dedicated API key status
+      setApiKeyStatus('API Key cannot be empty.');
+      return;
+    }
+    localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, newApiKey);
+    setApiKey(newApiKey);
+    // updateStatus('API Key saved successfully!', 'success');
+    setApiKeyStatus('API Key saved successfully!');
+    setActiveTab('home'); // Navigate to home after saving API key
+  };
+
+  // The new handleApiKeyRemove function
+  const handleApiKeyRemove = () => {
+    localStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+    setApiKey(null);
+    // updateStatus('API Key removed.', 'info');
+    setApiKeyStatus('API Key removed.');
+    // setActiveTab('home'); // Or to ApiKeyPage if it's forced when key is null
+  };
 
   function updateStatus(msg: string, type: 'info' | 'loading' | 'success' | 'error' = 'info') {
     setStatus(msg);
@@ -316,44 +339,46 @@ export default function App() {
     }
   }
 
-  const handleApiKeySave = (newApiKey: string) => {
-    localStorage.setItem('apiKey', newApiKey);
-    setApiKey(newApiKey);
-    setActiveTab('home'); // Navigate to home after saving API key
-  };
-
-  const handleApiKeyRemove = () => {
-    localStorage.removeItem('apiKey');
-    setApiKey(null);
-    setActiveTab('home'); // Or perhaps to a dedicated "logged out" page or back to ApiKeyPage implicitly
-  }
-
   if (isLoadingApiKey) {
     return <div>Loading...</div>; // Or a proper loading spinner
   }
 
-  const renderPage = () => {
-    if (!apiKey) {
-      return <ApiKeyPage onApiKeySave={handleApiKeySave} />;
-    }
-
-    switch (activeTab) {
-      case 'home':
-        return <HomePage />;
-      case 'history':
-        return <HistoryPage />;
-      case 'settings':
-        // Settings page will need access to apiKey and remove/update functions
-        return <SettingsPage currentApiKey={apiKey} onApiKeyUpdate={handleApiKeySave} onApiKeyRemove={handleApiKeyRemove} />;
-      default:
-        return <HomePage />;
-    }
-  };
+  // Render logic based on API key presence and activeTab
+  if (!apiKey) {
+    return <ApiKeyPage onApiKeySave={handleApiKeySave} />;
+  }
 
   return (
     <div className="App">
-      {renderPage()}
-      {apiKey && <TabBar activeTab={activeTab} onTabChange={setActiveTab} />}
+      {activeTab === 'home' && (
+        <HomePage
+          // Pass necessary props if HomePage needs to interact with App's state/functions
+          // For example, if HomePage triggers transcription:
+          // onTranscribe={transcribe}
+          // transcription={transcription}
+          // status={status}
+          // statusType={statusType}
+          // setFile={setFile}
+          // sharedFile={sharedFile}
+          // transcribing={transcribing}
+        />
+      )}
+      {activeTab === 'history' && (
+        <HistoryPage
+          // history={history}
+          // onDeleteHistory={deleteHistory}
+          // onCopyText={(text) => navigator.clipboard.writeText(text).then(() => updateStatus('Copied!', 'success'))}
+        />
+      )}
+      {activeTab === 'settings' && (
+        <SettingsPage
+          currentApiKey={apiKey}
+          onApiKeyUpdate={handleApiKeySave} // Re-use save for update
+          onApiKeyRemove={handleApiKeyRemove}
+          apiKeyStatus={apiKeyStatus} // Pass status for feedback
+        />
+      )}
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
