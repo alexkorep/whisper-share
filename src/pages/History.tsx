@@ -1,4 +1,13 @@
 import React from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Stack,
+} from '@mui/material';
 
 interface HistoryEntry {
   id: string;
@@ -15,23 +24,45 @@ interface HistoryProps {
 
 const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
   return (
-    <div className="history-page">
-      <h2>History</h2>
-      {history.length === 0 && <div className="empty-history">No transcriptions yet.</div>}
+    <Box className="history-page">
+      <Typography variant="h5" gutterBottom>
+        History
+      </Typography>
+      {history.length === 0 && (
+        <Typography className="empty-history">No transcriptions yet.</Typography>
+      )}
       {history.map(entry => (
-        <div className="history-entry-card" key={entry.id}>
-          <div className="history-meta">
-            <strong>{entry.filename || 'Untitled'}</strong>
-            <span className="history-date">{new Date(entry.date).toLocaleString()}</span>
-          </div>
-          <textarea readOnly rows={4} value={entry.text}></textarea>
-          <div className="history-actions">
-            <button onClick={() => onCopy(entry.text)}>Copy</button>
-            <button onClick={() => onDelete(entry.id)}>Delete</button>
-          </div>
-        </div>
+        <Card className="history-entry-card" key={entry.id}
+          sx={{ mb: 2 }}>
+          <CardContent>
+            <Box className="history-meta">
+              <Typography component="span" fontWeight="bold">
+                {entry.filename || 'Untitled'}
+              </Typography>
+              <Typography component="span" className="history-date">
+                {new Date(entry.date).toLocaleString()}
+              </Typography>
+            </Box>
+            <TextField
+              multiline
+              rows={4}
+              fullWidth
+              value={entry.text}
+              InputProps={{ readOnly: true }}
+              sx={{ mt: 1 }}
+            />
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }} className="history-actions">
+              <Button variant="outlined" onClick={() => onCopy(entry.text)}>
+                Copy
+              </Button>
+              <Button variant="outlined" onClick={() => onDelete(entry.id)}>
+                Delete
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
       ))}
-    </div>
+    </Box>
   );
 };
 
