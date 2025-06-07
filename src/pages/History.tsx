@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -7,6 +7,11 @@ import {
   TextField,
   Button,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 
 interface HistoryEntry {
@@ -24,7 +29,10 @@ interface HistoryProps {
 }
 
 
+
 const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   // Share handler for Web Share API
   const handleShare = (entry: HistoryEntry) => {
     if (navigator.share) {
@@ -35,6 +43,21 @@ const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
     } else {
       alert('Web Share API is not supported in this browser.');
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteId(null);
   };
 
   return (
@@ -64,22 +87,41 @@ const History: React.FC<HistoryProps> = ({ history, onCopy, onDelete }) => {
               InputProps={{ readOnly: true }}
               sx={{ mt: 1 }}
             />
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-              <Button variant="outlined" onClick={() => onCopy(entry.text)}>
-                Copy
-              </Button>
-              <Button variant="outlined" onClick={() => onDelete(entry.id)}>
+            <Stack direction="row" spacing={1} sx={{ mt: 1, justifyContent: 'space-between' }}>
+              <Box>
+                <Button variant="outlined" onClick={() => onCopy(entry.text)}>
+                  Copy
+                </Button>
+                {'share' in navigator && typeof navigator.share === 'function' && (
+                  <Button variant="outlined" onClick={() => handleShare(entry)} sx={{ ml: 1 }}>
+                    Share
+                  </Button>
+                )}
+              </Box>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={() => handleDelete(entry.id)}
+                sx={{ ml: 'auto' }}
+              >
                 Delete
               </Button>
-              {'share' in navigator && typeof navigator.share === 'function' && (
-                <Button variant="outlined" onClick={() => handleShare(entry)}>
-                  Share
-                </Button>
-              )}
             </Stack>
           </CardContent>
         </Card>
       ))}
+      <Dialog open={!!deleteId} onClose={cancelDelete}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this entry? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete}>Cancel</Button>
+          <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
