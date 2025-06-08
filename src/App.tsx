@@ -47,7 +47,13 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [sharedFile, setSharedFile] = useState<File | null>(null);
-  const [selectedApi, setSelectedApi] = useState<string>("gpt4o");
+  const SELECTED_API_STORAGE_KEY = "transcriber_selected_api";
+  const [selectedApi, setSelectedApiState] = useState<string>("gpt4o");
+  // Wrap setSelectedApi to also save to localStorage
+  const setSelectedApi = (api: string) => {
+    setSelectedApiState(api);
+    localStorage.setItem(SELECTED_API_STORAGE_KEY, api);
+  };
   const {
     transcription,
     setTranscription,
@@ -70,6 +76,12 @@ export default function App() {
     } else {
       setApiKeyStatus("API Key not set. Please enter and save.");
       setApiKeySaved(false);
+    }
+
+    // Load selectedApi from localStorage if available
+    const storedApi = localStorage.getItem(SELECTED_API_STORAGE_KEY);
+    if (storedApi === "whisper" || storedApi === "gpt4o") {
+      setSelectedApiState(storedApi);
     }
 
     try {
