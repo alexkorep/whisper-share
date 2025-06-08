@@ -47,6 +47,7 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [sharedFile, setSharedFile] = useState<File | null>(null);
+  const [selectedApi, setSelectedApi] = useState<string>("gpt4o");
   const {
     transcription,
     setTranscription,
@@ -56,6 +57,7 @@ export default function App() {
     apiKey,
     onSaveTranscription: saveTranscription,
     onStatus: updateStatus,
+    selectedApi,
   });
   // Removed ffmpegRef and ffmpegLoadedRef, now handled in useTranscription hook
 
@@ -288,6 +290,8 @@ export default function App() {
             status={status}
             statusType={statusType}
             transcription={transcription}
+            selectedApi={selectedApi}
+            setSelectedApi={setSelectedApi}
           />
         )}
         {tab === "history" && (

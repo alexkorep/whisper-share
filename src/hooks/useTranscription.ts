@@ -18,12 +18,14 @@ export type UseTranscriptionParams = {
     msg: string,
     type?: "info" | "loading" | "success" | "error"
   ) => void;
+  selectedApi?: string;
 };
 
 export function useTranscription({
   apiKey,
   onSaveTranscription,
   onStatus,
+  selectedApi = "gpt4o",
 }: UseTranscriptionParams) {
   const [transcription, setTranscription] = useState<string>("");
   const [transcribing, setTranscribing] = useState<boolean>(false);
@@ -170,49 +172,78 @@ export function useTranscription({
       );
     }
     try {
-      onStatus("Reading file data…", "loading");
-      const base64 = await readFileAsBase64(mp3File);
-      const body = buildOpenAIRequest(base64);
-      onStatus("Sending to OpenAI…", "loading");
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({ error: { message: res.statusText } }));
-        throw new Error(
-          `API ${res.status}: ${err.error?.message || res.statusText}`
-        );
-      }
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content;
-      // Calculate price if usage info is present
-      let priceMsg = "";
-      if (data?.usage) {
-        const inputTokens = data.usage.prompt_tokens || 0;
-        const outputTokens = data.usage.completion_tokens || 0;
-        // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
-        const inputCost = (inputTokens * 0.15) / 1_000_000;
-        const outputCost = (outputTokens * 0.6) / 1_000_000;
-        const totalCost = inputCost + outputCost;
-        priceMsg = ` (OpenAI API cost: $${totalCost.toFixed(5)})`;
-      }
-      if (text) {
-        setTranscription(text);
-        onStatus(`Transcription complete!${priceMsg}`, "success");
-        onSaveTranscription({ filename: inputFile.name, text });
+      if (selectedApi === "whisper") {
+        onStatus("Sending to Whisper API…", "loading");
+        const formData = new FormData();
+        formData.append("file", mp3File, mp3File.name);
+        formData.append("model", "whisper-1");
+        formData.append("language", "ru");
+        // Optionally, add prompt or other params here
+        const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+          throw new Error(`Whisper API ${res.status}: ${err.error?.message || res.statusText}`);
+        }
+        const data = await res.json();
+        const text = data.text;
+        if (text) {
+          setTranscription(text);
+          onStatus(`Transcription complete! (Whisper API)`, "success");
+          onSaveTranscription({ filename: inputFile.name, text });
+        } else {
+          throw new Error("Unexpected Whisper API response structure.");
+        }
       } else {
-        throw new Error("Unexpected response structure.");
+        onStatus("Reading file data…", "loading");
+        const base64 = await readFileAsBase64(mp3File);
+        const body = buildOpenAIRequest(base64);
+        onStatus("Sending to OpenAI…", "loading");
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res
+            .json()
+            .catch(() => ({ error: { message: res.statusText } }));
+          throw new Error(
+            `API ${res.status}: ${err.error?.message || res.statusText}`
+          );
+        }
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content;
+        // Calculate price if usage info is present
+        let priceMsg = "";
+        if (data?.usage) {
+          const inputTokens = data.usage.prompt_tokens || 0;
+          const outputTokens = data.usage.completion_tokens || 0;
+          // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
+          const inputCost = (inputTokens * 0.15) / 1_000_000;
+          const outputCost = (outputTokens * 0.6) / 1_000_000;
+          const totalCost = inputCost + outputCost;
+          priceMsg = ` (OpenAI API cost: $${totalCost.toFixed(5)})`;
+        }
+        if (text) {
+          setTranscription(text);
+          onStatus(`Transcription complete!${priceMsg}`, "success");
+          onSaveTranscription({ filename: inputFile.name, text });
+        } else {
+          throw new Error("Unexpected response structure.");
+        }
       }
     } catch (err: any) {
       console.error("Transcription error:", err);
-      onStatus(`Error: ${err.message}`, "error");
+      onStatus(`Error: ${err.message}", "error`);
       setTranscription(`Error: ${err.message}`);
     } finally {
       setTranscribing(false);

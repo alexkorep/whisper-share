@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Radio, RadioGroup, FormControlLabel, FormControl, FormLabel } from '@mui/material';
 import {
   Box,
   Button,
@@ -23,8 +24,10 @@ interface HomeProps {
   transcribe: () => void;
   transcribing: boolean;
   status: string;
-  statusType: 'info' | 'loading' | 'success' | 'error';
+  statusType: "info" | "loading" | "success" | "error";
   transcription: string;
+  selectedApi: string;
+  setSelectedApi: (api: string) => void;
 }
 
 const Home: React.FC<HomeProps> = ({
@@ -42,6 +45,8 @@ const Home: React.FC<HomeProps> = ({
   status,
   statusType,
   transcription,
+  selectedApi,
+  setSelectedApi,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +90,18 @@ const Home: React.FC<HomeProps> = ({
         <>
           <Card sx={{ mb: 2 }}>
             <CardContent>
+              <FormControl component="fieldset" sx={{ mb: 2 }}>
+                <FormLabel component="legend">Transcription API</FormLabel>
+                <RadioGroup
+                  row
+                  value={selectedApi}
+                  onChange={e => setSelectedApi(e.target.value)}
+                  name="transcription-api"
+                >
+                  <FormControlLabel value="gpt4o" control={<Radio />} label="GPT-4o" />
+                  <FormControlLabel value="whisper" control={<Radio />} label="Whisper API" />
+                </RadioGroup>
+              </FormControl>
               {!sharedFile ? (
                 <>
                   <Button
