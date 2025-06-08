@@ -243,8 +243,9 @@ export function useTranscription({
       }
     } catch (err: any) {
       console.error("Transcription error:", err);
-      onStatus(`Error: ${err.message}", "error`);
-      setTranscription(`Error: ${err.message}`);
+      const msg = err && err.message ? `Error: ${err.message}` : "Error: Unknown error";
+      onStatus(msg, "error");
+      setTranscription(msg);
     } finally {
       setTranscribing(false);
     }
