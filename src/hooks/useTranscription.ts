@@ -11,15 +11,20 @@ export interface HistoryEntry {
   date: string;
 }
 
+export type UseTranscriptionParams = {
+  apiKey: string;
+  onSaveTranscription: (entry: { filename: string; text: string }) => void;
+  onStatus: (
+    msg: string,
+    type?: "info" | "loading" | "success" | "error"
+  ) => void;
+};
+
 export function useTranscription({
   apiKey,
   onSaveTranscription,
   onStatus,
-}: {
-  apiKey: string;
-  onSaveTranscription: (entry: { filename: string; text: string }) => void;
-  onStatus: (msg: string, type?: "info" | "loading" | "success" | "error") => void;
-}) {
+}: UseTranscriptionParams) {
   const [transcription, setTranscription] = useState<string>("");
   const [transcribing, setTranscribing] = useState<boolean>(false);
   const ffmpegRef = useRef<FFmpeg | undefined>();
@@ -31,7 +36,10 @@ export function useTranscription({
     const ffmpeg = new FFmpeg();
     ffmpeg.on("progress", ({ progress }) => {
       if (progress > 0 && progress < 1) {
-        onStatus(`Conversion progress: ${(progress * 100).toFixed(1)} %`, "loading");
+        onStatus(
+          `Conversion progress: ${(progress * 100).toFixed(1)} %`,
+          "loading"
+        );
       }
     });
     ffmpegRef.current = ffmpeg;
@@ -156,7 +164,10 @@ export function useTranscription({
         inputFile.size >= 1024 * 1024
           ? (inputFile.size / (1024 * 1024)).toFixed(2) + " MB"
           : (inputFile.size / 1024).toFixed(1) + " KB";
-      onStatus(`MP3 detected - no conversion needed. File size: ${fileSizeMsg}`, "info");
+      onStatus(
+        `MP3 detected - no conversion needed. File size: ${fileSizeMsg}`,
+        "info"
+      );
     }
     try {
       onStatus("Reading file data…", "loading");
