@@ -3,6 +3,9 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
 
 const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian text.\n# Notes\n• Preserve speaker's wording.\n• Use correct punctuation/capitalisation.\n• For unclear segments mark [unintelligible] plus timestamp.`;
+// See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
+const GPT_4O_MINI_CONST_PER_INPUT_TOKEN = 10.0 / 1_000_000; // $10 per million input tokens
+const GPT_4O_MINI_CONST_PER_OUTPUT_TOKEN = 0.6 / 1_000_000; // $0.60 per million output tokens
 
 export interface HistoryEntry {
   id: string;
@@ -179,16 +182,23 @@ export function useTranscription({
         formData.append("model", "whisper-1");
         formData.append("language", "ru");
         // Optionally, add prompt or other params here
-        const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: formData,
-        });
+        const res = await fetch(
+          "https://api.openai.com/v1/audio/transcriptions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: formData,
+          }
+        );
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-          throw new Error(`Whisper API ${res.status}: ${err.error?.message || res.statusText}`);
+          const err = await res
+            .json()
+            .catch(() => ({ error: { message: res.statusText } }));
+          throw new Error(
+            `Whisper API ${res.status}: ${err.error?.message || res.statusText}`
+          );
         }
         const data = await res.json();
         const text = data.text;
@@ -227,9 +237,8 @@ export function useTranscription({
         if (data?.usage) {
           const inputTokens = data.usage.prompt_tokens || 0;
           const outputTokens = data.usage.completion_tokens || 0;
-          // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
-          const inputCost = (inputTokens * 0.15) / 1_000_000;
-          const outputCost = (outputTokens * 0.6) / 1_000_000;
+          const inputCost = inputTokens * GPT_4O_MINI_CONST_PER_INPUT_TOKEN;
+          const outputCost = outputTokens * GPT_4O_MINI_CONST_PER_OUTPUT_TOKEN;
           const totalCost = inputCost + outputCost;
           priceMsg = ` (OpenAI API cost: $${totalCost.toFixed(5)})`;
         }
@@ -243,7 +252,8 @@ export function useTranscription({
       }
     } catch (err: any) {
       console.error("Transcription error:", err);
-      const msg = err && err.message ? `Error: ${err.message}` : "Error: Unknown error";
+      const msg =
+        err && err.message ? `Error: ${err.message}` : "Error: Unknown error";
       onStatus(msg, "error");
       setTranscription(msg);
     } finally {
