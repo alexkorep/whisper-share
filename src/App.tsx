@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile } from "@ffmpeg/util";
+import { useTranscription } from "./hooks/useTranscription";
 import Home from "./pages/Home";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
@@ -45,13 +44,20 @@ export default function App() {
   const [statusType, setStatusType] = useState<
     "info" | "loading" | "success" | "error"
   >("info");
-  const [transcription, setTranscription] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [sharedFile, setSharedFile] = useState<File | null>(null);
-  const [transcribing, setTranscribing] = useState(false);
-  const ffmpegRef = useRef<FFmpeg>();
-  const ffmpegLoadedRef = useRef(false);
+  const {
+    transcription,
+    setTranscription,
+    transcribing,
+    transcribe: transcribeHook,
+  } = useTranscription({
+    apiKey,
+    onSaveTranscription: saveTranscription,
+    onStatus: updateStatus,
+  });
+  // Removed ffmpegRef and ffmpegLoadedRef, now handled in useTranscription hook
 
   useEffect(() => {
     const key = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || "";
@@ -184,76 +190,7 @@ export default function App() {
     );
   }
 
-  async function ensureFFmpegLoaded() {
-    if (ffmpegLoadedRef.current) return;
-    updateStatus("Loading FFmpeg core (~30 MB)…", "loading");
-    const ffmpeg = new FFmpeg();
-    ffmpeg.on("progress", ({ progress }) => {
-      if (progress > 0 && progress < 1) {
-        updateStatus(
-          `Conversion progress: ${(progress * 100).toFixed(1)} %`,
-          "loading"
-        );
-      }
-    });
-    ffmpegRef.current = ffmpeg;
-    try {
-      let coreURL: string, wasmURL: string;
-      // @ts-ignore
-      const env = (import.meta as any).env || { DEV: false, BASE_URL: "/" };
-      if (env.DEV) {
-        const baseURL = env.BASE_URL || "/";
-        coreURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js`;
-        wasmURL = `${window.location.origin}${baseURL}node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm`;
-      } else {
-        const baseURL = env.BASE_URL || "/";
-        coreURL = `${window.location.origin}${baseURL}ffmpeg-core.js`;
-        wasmURL = `${window.location.origin}${baseURL}ffmpeg-core.wasm`;
-      }
-      await ffmpeg.load({ coreURL, wasmURL });
-      ffmpegLoadedRef.current = true;
-      updateStatus("FFmpeg engine ready.", "success");
-    } catch (err) {
-      console.error("FFmpeg failed to load:", err);
-      updateStatus("Error: FFmpeg engine could not be loaded.", "error");
-      throw err;
-    }
-  }
-
-  async function convertToMp3(inputFile: File): Promise<File> {
-    await ensureFFmpegLoaded();
-    const ffmpeg = ffmpegRef.current!;
-
-    const inputName = inputFile.name || "input";
-    const outputName = "output.mp3";
-    updateStatus(`Converting "${inputName}" to MP3…`, "loading");
-    try {
-      await ffmpeg.writeFile(inputName, await fetchFile(inputFile));
-      await ffmpeg.exec(["-i", inputName, outputName]);
-      const data = await ffmpeg.readFile(outputName);
-      await ffmpeg.deleteFile(inputName);
-      await ffmpeg.deleteFile(outputName);
-      updateStatus(`Conversion of "${inputName}" complete.`, "success");
-      // @ts-ignore
-      const buffer =
-        data instanceof Uint8Array
-          ? data
-          : data && data.buffer
-          ? data.buffer
-          : data;
-      return new File([buffer], "converted.mp3", { type: "audio/mpeg" });
-    } catch (err: any) {
-      console.error("FFmpeg conversion error:", err);
-      updateStatus(`Error converting "${inputName}": ${err.message}`, "error");
-      try {
-        await ffmpeg.deleteFile(inputName);
-      } catch {}
-      try {
-        await ffmpeg.deleteFile(outputName);
-      } catch {}
-      throw err;
-    }
-  }
+  // FFmpeg and conversion logic moved to useTranscription hook
 
   function readFileAsBase64(f: File): Promise<string | ArrayBuffer | null> {
     return new Promise((resolve, reject) => {
@@ -293,93 +230,13 @@ export default function App() {
     };
   }
 
-  async function transcribe() {
-    if (!apiKey) {
-      updateStatus("Error: OpenAI API Key is not set.", "error");
-      return;
-    }
+  function transcribe() {
     const inputFile = sharedFile || file;
     if (!inputFile) {
       updateStatus("Error: No audio file selected or shared.", "error");
       return;
     }
-    setTranscribing(true);
-    setTranscription("");
-    updateStatus(
-      `Preparing audio file… File size: ${
-        inputFile.size >= 1024 * 1024
-          ? (inputFile.size / (1024 * 1024)).toFixed(2) + " MB"
-          : (inputFile.size / 1024).toFixed(1) + " KB"
-      }`,
-      "loading"
-    );
-    let mp3File = inputFile;
-    if (!inputFile.name.toLowerCase().endsWith(".mp3")) {
-      try {
-        mp3File = await convertToMp3(inputFile);
-      } catch {
-        setTranscribing(false);
-        return;
-      }
-    } else {
-      updateStatus(
-        `MP3 detected – no conversion needed. File size: ${
-          inputFile.size >= 1024 * 1024
-            ? (inputFile.size / (1024 * 1024)).toFixed(2) + " MB"
-            : (inputFile.size / 1024).toFixed(1) + " KB"
-        }`,
-        "info"
-      );
-    }
-
-    try {
-      updateStatus("Reading file data…", "loading");
-      const base64 = await readFileAsBase64(mp3File);
-      const body = buildOpenAIRequest(base64);
-      updateStatus("Sending to OpenAI…", "loading");
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({ error: { message: res.statusText } }));
-        throw new Error(
-          `API ${res.status}: ${err.error?.message || res.statusText}`
-        );
-      }
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content;
-      // Calculate price if usage info is present
-      let priceMsg = "";
-      if (data?.usage) {
-        const inputTokens = data.usage.prompt_tokens || 0;
-        const outputTokens = data.usage.completion_tokens || 0;
-        // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
-        const inputCost = (inputTokens * 0.15) / 1_000_000;
-        const outputCost = (outputTokens * 0.6) / 1_000_000;
-        const totalCost = inputCost + outputCost;
-        priceMsg = ` (OpenAI API cost: $${totalCost.toFixed(5)})`;
-      }
-      if (text) {
-        setTranscription(text);
-        updateStatus(`Transcription complete!${priceMsg}`, "success");
-        saveTranscription({ filename: inputFile.name, text });
-      } else {
-        throw new Error("Unexpected response structure.");
-      }
-    } catch (err: any) {
-      console.error("Transcription error:", err);
-      updateStatus(`Error: ${err.message}`, "error");
-      setTranscription(`Error: ${err.message}`);
-    } finally {
-      setTranscribing(false);
-    }
+    transcribeHook(inputFile);
   }
 
   function saveKey() {
