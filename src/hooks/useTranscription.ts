@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
 
-const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian text.\n# Notes\n• Preserve speaker's wording.\n• Use correct punctuation/capitalisation.\n• For unclear segments mark [unintelligible] plus timestamp.`;
+const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into text.\n# Notes\n• Preserve speaker's wording.\n• Use correct punctuation/capitalisation.\n• For unclear segments mark [unintelligible] plus timestamp.`;
 // See https://platform.openai.com/docs/pricing for gpt-4o-mini-audio-preview
 const GPT_4O_MINI_CONST_PER_INPUT_TOKEN = 10.0 / 1_000_000; // $10 per million input tokens
 const GPT_4O_MINI_CONST_PER_OUTPUT_TOKEN = 0.6 / 1_000_000; // $0.60 per million output tokens
@@ -180,7 +180,7 @@ export function useTranscription({
         const formData = new FormData();
         formData.append("file", mp3File, mp3File.name);
         formData.append("model", "whisper-1");
-        formData.append("language", "ru");
+        //formData.append("language", "ru");
         // Optionally, add prompt or other params here
         const res = await fetch(
           "https://api.openai.com/v1/audio/transcriptions",

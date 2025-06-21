@@ -27,12 +27,6 @@ interface HistoryEntry {
   date: string;
 }
 
-const TRANSCRIPTION_INSTRUCTIONS = `Transcribe the following audio into Russian text.
-# Notes
-• Preserve speaker's wording.
-• Use correct punctuation/capitalisation.
-• For unclear segments mark [unintelligible] plus timestamp.`;
-
 type Tab = "home" | "history" | "settings";
 
 export default function App() {
@@ -215,34 +209,6 @@ export default function App() {
     });
   }
 
-  function buildOpenAIRequest(base64: string | ArrayBuffer | null) {
-    const dataStr = typeof base64 === "string" ? base64 : "";
-    return {
-      model: "gpt-4o-mini-audio-preview",
-      messages: [
-        {
-          role: "system",
-          content: [{ type: "text", text: TRANSCRIPTION_INSTRUCTIONS }],
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "" },
-            {
-              type: "input_audio",
-              input_audio: {
-                data: dataStr.split(",")[1],
-                format: "mp3",
-              },
-            },
-          ],
-        },
-      ],
-      modalities: ["text"],
-      temperature: 1,
-      max_completion_tokens: 16384,
-    };
-  }
 
   function transcribe() {
     const inputFile = sharedFile || file;
