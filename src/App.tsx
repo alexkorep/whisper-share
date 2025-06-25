@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranscription } from "./hooks/useTranscription";
-import Home from "./pages/Home";
+import Home, { WhisperLang } from "./pages/Home";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import {
@@ -43,6 +43,14 @@ export default function App() {
   const [sharedFile, setSharedFile] = useState<File | null>(null);
   const SELECTED_API_STORAGE_KEY = "transcriber_selected_api";
   const [selectedApi, setSelectedApiState] = useState<string>("gpt4o");
+  const [whisperLang, setWhisperLang] = useState<WhisperLang>(() => {
+    return (localStorage.getItem('whisperLang') === "en") ? "en" : "ru";
+  });
+  useEffect(() => {
+    localStorage.setItem('whisperLang', whisperLang);
+  }, [whisperLang]);
+
+
   // Wrap setSelectedApi to also save to localStorage
   const setSelectedApi = (api: string) => {
     setSelectedApiState(api);
@@ -50,7 +58,6 @@ export default function App() {
   };
   const {
     transcription,
-    setTranscription,
     transcribing,
     transcribe: transcribeHook,
   } = useTranscription({
@@ -58,8 +65,8 @@ export default function App() {
     onSaveTranscription: saveTranscription,
     onStatus: updateStatus,
     selectedApi,
+    language: whisperLang,
   });
-  // Removed ffmpegRef and ffmpegLoadedRef, now handled in useTranscription hook
 
   useEffect(() => {
     const key = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || "";
@@ -270,6 +277,9 @@ export default function App() {
             transcription={transcription}
             selectedApi={selectedApi}
             setSelectedApi={setSelectedApi}
+            whisperLang={whisperLang}
+            setWhisperLang={setWhisperLang}
+            
           />
         )}
         {tab === "history" && (

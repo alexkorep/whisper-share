@@ -38,6 +38,8 @@ describe('useTranscription', () => {
     apiKey: 'test-key',
     onSaveTranscription: mockOnSaveTranscription,
     onStatus: mockOnStatus,
+    selectedApi: 'gpt4o',
+    language: 'en',
   };
 
   it('should initialize with default state', () => {

@@ -22,6 +22,7 @@ export type UseTranscriptionParams = {
     type?: "info" | "loading" | "success" | "error"
   ) => void;
   selectedApi?: string;
+  language: "en" | "ru";
 };
 
 export function useTranscription({
@@ -29,6 +30,7 @@ export function useTranscription({
   onSaveTranscription,
   onStatus,
   selectedApi = "gpt4o",
+  language = "en",
 }: UseTranscriptionParams) {
   const [transcription, setTranscription] = useState<string>("");
   const [transcribing, setTranscribing] = useState<boolean>(false);
@@ -180,7 +182,7 @@ export function useTranscription({
         const formData = new FormData();
         formData.append("file", mp3File, mp3File.name);
         formData.append("model", "whisper-1");
-        //formData.append("language", "ru");
+        formData.append("language", language);
         // Optionally, add prompt or other params here
         const res = await fetch(
           "https://api.openai.com/v1/audio/transcriptions",

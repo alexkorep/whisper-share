@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Radio, RadioGroup, FormControlLabel, FormControl, FormLabel } from '@mui/material';
 import {
   Box,
@@ -10,6 +10,8 @@ import {
   Alert,
   Stack,
 } from '@mui/material';
+
+export type WhisperLang = 'en' | 'ru';
 
 interface HomeProps {
   apiKey: string;
@@ -28,6 +30,8 @@ interface HomeProps {
   transcription: string;
   selectedApi: string;
   setSelectedApi: (api: string) => void;
+  whisperLang: WhisperLang;
+  setWhisperLang: (lang: WhisperLang) => void;
 }
 
 const Home: React.FC<HomeProps> = ({
@@ -47,7 +51,10 @@ const Home: React.FC<HomeProps> = ({
   transcription,
   selectedApi,
   setSelectedApi,
+  whisperLang,
+  setWhisperLang,
 }) => {
+  // Whisper language state and persistence
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const alertSeverity =
@@ -102,6 +109,20 @@ const Home: React.FC<HomeProps> = ({
                   <FormControlLabel value="whisper" control={<Radio />} label="Whisper API" />
                 </RadioGroup>
               </FormControl>
+              {selectedApi === 'whisper' && (
+                <FormControl sx={{ mb: 2, minWidth: 120 }}>
+                  <FormLabel id="whisper-lang-label">Language</FormLabel>
+                  <select
+                    id="whisper-lang-select"
+                    value={whisperLang}
+                    onChange={e => setWhisperLang(e.target.value === 'en' ? 'en' : 'ru')}
+                    style={{ marginTop: 4, padding: 6, borderRadius: 4, borderColor: '#ccc' }}
+                  >
+                    <option value="en">English (en)</option>
+                    <option value="ru">Russian (ru)</option>
+                  </select>
+                </FormControl>
+              )}
               {!sharedFile ? (
                 <>
                   <Button
